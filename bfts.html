@@ -1,1 +1,1643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Biology Test for NEET</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    :root {
+      --primary: #4a6bff;
+      --primary-light: #6c8cff;
+      --correct: #28a745;
+      --wrong: #dc3545;
+      --unattempted: #ffc107;
+      --answered: #17a2b8;
+      --text-dark: #212529;
+      --text-light: #f8f9fa;
+    }
+    
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: #f8f9fa;
+      margin: 0;
+      padding: 0;
+      color: var(--text-dark);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .container {
+      max-width: 800px;
+      margin: 30px auto;
+      padding: 30px;
+      background: white;
+      border-radius: 15px;
+      box-shadow: 0 5px 25px rgba(0, 0, 0, 0.1);
+      flex: 1;
+    }
+    
+    #welcome-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, var(--primary), var(--primary-light));
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      color: white;
+      animation: fadeOut 5s forwards;
+    }
+    
+    @keyframes fadeOut {
+      0% { opacity: 1; }
+      80% { opacity: 1; }
+      100% { opacity: 0; visibility: hidden; }
+    }
+    
+    #welcome-screen h1 {
+      margin: 0;
+      font-size: 4rem;
+      text-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+      animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+    
+    #welcome-screen p {
+      font-size: 2rem;
+      margin-top: 20px;
+      text-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    #welcome-screen .icon {
+      font-size: 2.5rem;
+      animation: bounce 2s infinite;
+    }
+    
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+    
+    #intro-screen {
+      text-align: center;
+      padding: 20px;
+    }
+    
+    .title {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 10px;
+      background: linear-gradient(90deg, #4a6bff, #8a2be2);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    
+    .test-details {
+      background: #f1f5ff;
+      padding: 25px;
+      border-radius: 15px;
+      margin: 25px 0;
+      text-align: left;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .test-details::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 5px;
+      height: 100%;
+      background: var(--primary);
+    }
+    
+    .test-details p {
+      margin: 10px 0;
+      font-size: 1.1rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .test-details i {
+      color: var(--primary);
+      width: 20px;
+      text-align: center;
+    }
+    
+    .test-details strong {
+      color: var(--primary);
+    }
+    
+    .btn {
+      padding: 12px 30px;
+      border: none;
+      border-radius: 50px;
+      background: var(--primary);
+      color: white;
+      font-size: 1.1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      box-shadow: 0 4px 10px rgba(74, 107, 255, 0.3);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 15px rgba(74, 107, 255, 0.4);
+      background: var(--primary-light);
+    }
+    
+    .btn:active {
+      transform: translateY(0);
+    }
+    
+    .timer {
+      background: #fff4e6;
+      padding: 15px;
+      border-radius: 10px;
+      font-size: 1.2rem;
+      font-weight: 600;
+      color: #e67e22;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+    
+    #quiz-box {
+      display: none;
+    }
+    
+    .question-text {
+      font-size: 1.3rem;
+      font-weight: 600;
+      margin-bottom: 20px;
+      line-height: 1.5;
+      color: var(--text-dark);
+    }
+    
+    .options-container {
+      margin-bottom: 20px;
+    }
+    
+    .option {
+      display: block;
+      margin-bottom: 12px;
+      padding: 15px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: 2px solid transparent;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .option:hover {
+      background: #e9ecef;
+    }
+    
+    .option.selected {
+      background: #d1e7fd;
+      border-color: var(--primary);
+    }
+    
+    .option.correct {
+      background: #d4edda;
+      border-color: var(--correct);
+    }
+    
+    .option.incorrect {
+      background: #f8d7da;
+      border-color: var(--wrong);
+    }
+    
+    .option.correct-answer {
+      background: #d1e7fd;
+      border-color: var(--primary);
+    }
+    
+    .option-icon {
+      margin-right: 10px;
+      font-size: 1.2rem;
+    }
+    
+    .option.correct .option-icon {
+      color: var(--correct);
+    }
+    
+    .option.incorrect .option-icon {
+      color: var(--wrong);
+    }
+    
+    .option.correct-answer .option-icon {
+      color: var(--primary);
+    }
+    
+    .explanation {
+      margin-top: 20px;
+      padding: 20px;
+      background: #e7f5ff;
+      border-radius: 8px;
+      border-left: 4px solid var(--primary);
+      display: none;
+      animation: fadeIn 0.5s ease-out;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .explanation-title {
+      font-weight: 600;
+      margin-bottom: 10px;
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    #summary {
+      display: none;
+      text-align: center;
+      padding: 20px;
+      background: #f8f9fa;
+      border-radius: 10px;
+      margin-top: 30px;
+      animation: fadeIn 0.5s ease-out;
+    }
+    
+    .result-card {
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+      max-width: 500px;
+      margin: 0 auto;
+    }
+    
+    .result-title {
+      font-size: 1.8rem;
+      color: var(--primary);
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+    
+    .result-stats {
+      display: flex;
+      justify-content: space-around;
+      margin: 25px 0;
+      flex-wrap: wrap;
+      gap: 15px;
+    }
+    
+    .stat {
+      text-align: center;
+      min-width: 100px;
+      padding: 15px;
+      border-radius: 10px;
+    }
+    
+    .stat-correct {
+      background: #d4edda;
+    }
+    
+    .stat-wrong {
+      background: #f8d7da;
+    }
+    
+    .stat-unattempted {
+      background: #fff3cd;
+    }
+    
+    .stat-marks {
+      background: #e7f5ff;
+      border: 2px solid var(--primary);
+    }
+    
+    .stat-value {
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 5px;
+    }
+    
+    .stat-correct .stat-value {
+      color: var(--correct);
+    }
+    
+    .stat-wrong .stat-value {
+      color: var(--wrong);
+    }
+    
+    .stat-unattempted .stat-value {
+      color: var(--unattempted);
+    }
+    
+    .stat-marks .stat-value {
+      color: var(--primary);
+    }
+    
+    .review-controls {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      margin-top: 30px;
+      flex-wrap: wrap;
+    }
+    
+    .question-nav-container {
+      margin-top: 20px;
+      text-align: center;
+    }
+    
+    .toggle-nav-btn {
+      padding: 10px 20px;
+      border-radius: 50px;
+      background: #6c757d;
+      color: white;
+      border: none;
+      cursor: pointer;
+      margin-bottom: 15px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.3s;
+    }
+    
+    .toggle-nav-btn:hover {
+      background: #5a6268;
+      transform: translateY(-2px);
+    }
+    
+    .question-nav {
+      display: none;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+      animation: fadeIn 0.3s ease-out;
+    }
+    
+    .question-nav.active {
+      display: flex;
+    }
+    
+    .q-nav-btn {
+      width: 45px;
+      height: 45px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .q-nav-btn::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.2);
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    
+    .q-nav-btn:hover::after {
+      opacity: 1;
+    }
+    
+    .q-nav-btn.unattempted {
+      background: var(--unattempted);
+      color: #333;
+    }
+    
+    .q-nav-btn.answered {
+      background: var(--answered);
+      color: white;
+    }
+    
+    .q-nav-btn.correct {
+      background: var(--correct);
+      color: white;
+    }
+    
+    .q-nav-btn.incorrect {
+      background: var(--wrong);
+      color: white;
+    }
+    
+    .controls {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 30px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    
+    .nav-buttons {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    
+    .nav-btn {
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      transition: all 0.3s;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .nav-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+    
+    .nav-btn:active {
+      transform: translateY(0);
+    }
+    
+    .confirmation-dialog {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 2000;
+      justify-content: center;
+      align-items: center;
+      animation: fadeIn 0.3s ease-out;
+    }
+    
+    .confirmation-box {
+      background: white;
+      padding: 30px;
+      border-radius: 15px;
+      max-width: 400px;
+      width: 90%;
+      text-align: center;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+      transform: translateY(-20px);
+      animation: slideUp 0.3s ease-out forwards;
+    }
+    
+    @keyframes slideUp {
+      to { transform: translateY(0); }
+    }
+    
+    .confirmation-box h3 {
+      margin-top: 0;
+      color: var(--primary);
+      font-size: 1.5rem;
+    }
+    
+    .confirmation-buttons {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      margin-top: 25px;
+    }
+    
+    .confirmation-btn {
+      padding: 10px 20px;
+      border-radius: 50px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      border: 2px solid transparent;
+    }
+    
+    .confirmation-btn-primary {
+      background: var(--primary);
+      color: white;
+    }
+    
+    .confirmation-btn-primary:hover {
+      background: var(--primary-light);
+    }
+    
+    .confirmation-btn-secondary {
+      background: white;
+      color: var(--text-dark);
+      border-color: #6c757d;
+    }
+    
+    .confirmation-btn-secondary:hover {
+      background: #f8f9fa;
+    }
+    
+    @media (max-width: 768px) {
+      .container {
+        padding: 20px;
+        margin: 15px;
+      }
+      
+      #welcome-screen h1 {
+        font-size: 3rem;
+      }
+      
+      #welcome-screen p {
+        font-size: 1.5rem;
+      }
+      
+      .title {
+        font-size: 2rem;
+      }
+      
+      .test-details {
+        padding: 20px;
+      }
+      
+      .controls {
+        flex-direction: column;
+      }
+      
+      .nav-buttons {
+        width: 100%;
+        justify-content: space-between;
+      }
+      
+      .nav-btn, .btn {
+        width: 100%;
+        justify-content: center;
+      }
+      
+      .q-nav-btn {
+        width: 40px;
+        height: 40px;
+      }
+      
+      .result-stats {
+        flex-direction: column;
+        align-items: center;
+      }
+      
+      .stat {
+        width: 100%;
+        max-width: 200px;
+      }
+    }
+    
+    @media (max-width: 480px) {
+      #welcome-screen h1 {
+        font-size: 2.5rem;
+      }
+      
+      #welcome-screen p {
+        font-size: 1.2rem;
+      }
+      
+      .test-details p {
+        font-size: 1rem;
+      }
+      
+      .btn, .nav-btn {
+        padding: 10px 15px;
+        font-size: 1rem;
+      }
+      
+      .question-text {
+        font-size: 1.1rem;
+      }
+      
+      .option {
+        padding: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="welcome-screen">
+    <h1>All the Best❤</h1>
+    <p><i class="fas fa-heart icon"></i> Meri SANA! ❤️</p>
+  </div>
 
+  <div class="confirmation-dialog" id="confirmation-dialog">
+    <div class="confirmation-box">
+      <h3><i class="fas fa-question-circle"></i> Confirm Your Answer</h3>
+      <p>Are you sure about your selection?</p>
+      <div class="confirmation-buttons">
+        <button class="confirmation-btn confirmation-btn-primary" onclick="confirmSelection()">
+          <i class="fas fa-check"></i> Yes, Submit
+        </button>
+        <button class="confirmation-btn confirmation-btn-secondary" onclick="cancelSelection()">
+          <i class="fas fa-times"></i> No, Change
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="container">
+    <div id="intro-screen">
+      <div class="title">Sana Sab Kar Legi</div>
+      <div class="test-details">
+        <p><i class="fas fa-book"></i> <strong>Subject:</strong> Biology (12th)</p>
+        <p><i class="fas fa-tags"></i> <strong>Topics:</strong> Reproduction, Genetics, Evolution, Human Health, Biotechnology</p>
+        <p><i class="fas fa-question-circle"></i> <strong>Total Questions:</strong> 100</p>
+        <p><i class="fas fa-clock"></i> <strong>Time Limit:</strong> 60 minutes</p>
+        <p><i class="fas fa-star"></i> <strong>Marks:</strong> +4 for correct, -1 for wrong, 0 for unattempted</p>
+      </div>
+      <button class="btn" onclick="startQuiz()">
+        <i class="fas fa-play"></i> Start Test
+      </button>
+    </div>
+
+    <div class="timer" style="display: none;">
+      <i class="fas fa-clock"></i> <span id="timer">60:00</span>
+    </div>
+
+    <div id="quiz-box">
+      <div class="question-text" id="question-text"></div>
+      <div class="options-container" id="options"></div>
+      <div class="explanation" id="explanation">
+        <div class="explanation-title">
+          <i class="fas fa-lightbulb"></i> Explanation
+        </div>
+        <div id="explanation-text"></div>
+      </div>
+      
+      <div class="controls">
+        <div class="nav-buttons">
+          <button class="nav-btn" onclick="prevQuestion()">
+            <i class="fas fa-arrow-left"></i> Previous
+          </button>
+          <button class="nav-btn" onclick="nextQuestion()">
+            Next <i class="fas fa-arrow-right"></i>
+          </button>
+        </div>
+        <button class="btn" onclick="confirmSubmit()">
+          <i class="fas fa-stop"></i> End Test
+        </button>
+      </div>
+      
+      <div class="question-nav-container">
+        <button class="toggle-nav-btn" onclick="toggleQuestionNav()">
+          <i class="fas fa-list-ol"></i> Jump to Question
+        </button>
+        <div class="question-nav" id="question-nav"></div>
+      </div>
+    </div>
+
+    <div id="summary">
+      <div class="result-card">
+        <div class="result-title">
+          <i class="fas fa-trophy"></i> Your Test Results
+        </div>
+        <div class="result-stats">
+          <div class="stat stat-correct">
+            <div class="stat-value" id="correct-count">0</div>
+            <div>Correct</div>
+          </div>
+          <div class="stat stat-wrong">
+            <div class="stat-value" id="wrong-count">0</div>
+            <div>Wrong</div>
+          </div>
+          <div class="stat stat-unattempted">
+            <div class="stat-value" id="unattempted-count">0</div>
+            <div>Unattempted</div>
+          </div>
+          <div class="stat stat-marks">
+            <div class="stat-value" id="obtained-marks">0</div>
+            <div>Marks Obtained</div>
+          </div>
+          <div class="stat stat-marks">
+            <div class="stat-value">400</div>
+            <div>Total Marks</div>
+          </div>
+        </div>
+        
+        <div class="review-controls">
+          <button class="btn" onclick="reviewTest()">
+            <i class="fas fa-search"></i> Review Responses
+          </button>
+          <button class="btn" style="background: #6c757d;" onclick="location.reload()">
+            <i class="fas fa-redo"></i> New Test
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const quiz = [
+      {
+        question: "What is the ploidy level of the central cell in the embryo sac before fertilization?",
+        options: ["Haploid (n)", "Diploid (2n)", "Triploid (3n)", "Tetraploid (4n)"],
+        answer: 1,
+        explanation: "The central cell has two polar nuclei (n+n), making it diploid (2n) before fertilization. After fertilization (with 1 male gamete), it becomes triploid (3n) endosperm."
+      },
+      {
+        question: "Which of the following is NOT a pollinating agent for flowers?",
+        options: ["Bats", "Snails", "Earthworms", "Water"],
+        answer: 2,
+        explanation: "Earthworms do not pollinate. Bats (chiropterophily), snails (malacophily), and water (hydrophily) are known pollinating agents."
+      },
+      {
+        question: "Cleistogamous flowers are:",
+        options: ["Self-pollinated and never open", "Cross-pollinated by insects", "Wind-pollinated", "Sterile"],
+        answer: 0,
+        explanation: "Cleistogamous flowers (e.g., Viola) remain closed and self-pollinate, ensuring 100% seed set but no genetic variation."
+      },
+      {
+        question: "The stamen in a flower represents:",
+        options: ["Male reproductive part", "Female reproductive part", "Pollen tube", "Seed coat"],
+        answer: 0,
+        explanation: "Stamen (anther + filament) is the male reproductive part. Pistil (stigma, style, ovary) is the female part."
+      },
+      {
+        question: "Double fertilization in angiosperms involves:",
+        options: ["Fusion of two male gametes with one egg", "Fusion of one male gamete with egg and another with polar nuclei", "Fusion of two eggs with one male gamete", "Fusion of two polar nuclei with one male gamete"],
+        answer: 1,
+        explanation: "In double fertilization: 1 male gamete (n) + egg (n) → Zygote (2n); 1 male gamete (n) + 2 polar nuclei (n+n) → Endosperm (3n)."
+      },
+      {
+        question: "Apomixis is a type of:",
+        options: ["Sexual reproduction", "Asexual seed formation", "Cross-pollination", "Polyembryony"],
+        answer: 1,
+        explanation: "Apomixis is asexual seed formation without fertilization (e.g., in citrus, mango). It mimics sexual reproduction but bypasses meiosis."
+      },
+      {
+        question: "Which hormone triggers ovulation in females?",
+        options: ["FSH", "LH", "Progesterone", "Estrogen"],
+        answer: 1,
+        explanation: "The LH surge from the pituitary gland triggers ovulation (release of the ovum from the Graafian follicle). FSH stimulates follicle growth, while progesterone prepares the uterus for implantation."
+      },
+      {
+        question: "The acrosome of a sperm is derived from which cell organelle?",
+        options: ["Nucleus", "Mitochondria", "Golgi apparatus", "Centriole"],
+        answer: 2,
+        explanation: "The acrosome (contains enzymes like hyaluronidase for egg penetration) forms from the Golgi apparatus. Mitochondria power the sperm tail."
+      },
+      {
+        question: "Which layer of the uterus is shed during menstruation?",
+        options: ["Myometrium", "Perimetrium", "Endometrium", "Basal layer"],
+        answer: 2,
+        explanation: "The endometrium (functional layer) is shed during menstruation if fertilization doesn't occur. The myometrium is the muscular layer."
+      },
+      {
+        question: "Milk ejection in lactating mothers is stimulated by:",
+        options: ["Prolactin", "Oxytocin", "Estrogen", "Progesterone"],
+        answer: 1,
+        explanation: "Oxytocin causes milk ejection ('let-down reflex'), while prolactin stimulates milk production."
+      },
+      {
+        question: "Which of the following is NOT a male accessory gland?",
+        options: ["Seminal vesicle", "Prostate gland", "Bulbourethral gland", "Bartholin's gland"],
+        answer: 3,
+        explanation: "Bartholin's gland is a female accessory gland (lubricates vagina). Male glands include seminal vesicles, prostate, and bulbourethral glands."
+      },
+      {
+        question: "The fertilization membrane formed after sperm entry prevents:",
+        options: ["Implantation", "Polyspermy", "Cleavage", "Zygote formation"],
+        answer: 1,
+        explanation: "The cortical reaction post-fertilization forms a fertilization membrane to block polyspermy (entry of multiple sperm)."
+      },
+      {
+        question: "Which contraceptive method provides dual protection (prevents pregnancy + STDs)?",
+        options: ["Copper-T", "Oral contraceptive pills", "Condoms", "Diaphragm"],
+        answer: 2,
+        explanation: "Condoms (barrier method) prevent both pregnancy and STDs (HIV, gonorrhea). Other methods only prevent pregnancy."
+      },
+      {
+        question: "Medical Termination of Pregnancy (MTP) is safest during:",
+        options: ["First trimester (up to 12 weeks)", "Second trimester (13-20 weeks)", "Third trimester (after 26 weeks)", "Any time with equal safety"],
+        answer: 0,
+        explanation: "MTP is safest in the first trimester (lower complications). After 20 weeks, it's legally restricted except for fetal abnormalities."
+      },
+      {
+        question: "Which STD is caused by a bacterium?",
+        options: ["HIV/AIDS", "Genital herpes", "Syphilis", "Hepatitis B"],
+        answer: 2,
+        explanation: "Syphilis is caused by Treponema pallidum (bacterium). Others are viral (HIV: retrovirus; Herpes: HSV; Hepatitis B: HBV)."
+      },
+      {
+        question: "Amniocentesis is used to detect:",
+        options: ["Fetal heart defects", "Genetic disorders (e.g., Down syndrome)", "Maternal diabetes", "Placental position"],
+        answer: 1,
+        explanation: "Amniocentesis analyzes amniotic fluid for chromosomal abnormalities (e.g., Trisomy 21). Misused for sex determination, now regulated in India."
+      },
+      {
+        question: "The 'Saheli' contraceptive pill contains:",
+        options: ["Estrogen + Progesterone", "Only Progesterone", "Non-steroidal compound (Centchroman)", "Mifepristone"],
+        answer: 2,
+        explanation: "Saheli contains Centchroman (non-steroidal, weekly pill). Regular pills have estrogen + progesterone."
+      },
+      {
+        question: "Infertility treatment ICSI stands for:",
+        options: ["Intra-Cervical Sperm Injection", "Intra-Cytoplasmic Sperm Injection", "In Vitro Sperm Isolation", "Intra-Uterine Sperm Insertion"],
+        answer: 1,
+        explanation: "ICSI (Intra-Cytoplasmic Sperm Injection) injects sperm directly into the egg for IVF. Used in male infertility (low sperm count)."
+      },
+      {
+        question: "In Mendelian inheritance, the F2 generation of a monohybrid cross shows a phenotypic ratio of:",
+        options: ["1:1", "3:1", "9:3:3:1", "1:2:1"],
+        answer: 1,
+        explanation: "In a monohybrid cross (Aa × Aa), F2 shows 3:1 ratio (3 dominant : 1 recessive). The genotypic ratio is 1:2:1 (AA:Aa:aa)."
+      },
+      {
+        question: "A woman with blood group A (heterozygous) marries a man with blood group B (heterozygous). What is the chance of their child having blood group O?",
+        options: ["0%", "25%", "50%", "75%"],
+        answer: 1,
+        explanation: "Parents: IAi (A) × IBi (B). Possible offspring: IAIB (AB), IBi (B), IAi (A), ii (O) → 25% chance for O group."
+      },
+      {
+        question: "Turner syndrome is caused by:",
+        options: ["47, XXY", "45, X", "47, XYY", "47, XXX"],
+        answer: 1,
+        explanation: "Turner syndrome is 45, X (monosomy X). Klinefelter syndrome is 47, XXY."
+      },
+      {
+        question: "Which inheritance pattern shows both traits expressed equally in heterozygotes?",
+        options: ["Incomplete dominance", "Co-dominance", "Pleiotropy", "Polygenic inheritance"],
+        answer: 1,
+        explanation: "In co-dominance, both alleles are fully expressed (e.g., AB blood group). In incomplete dominance, blending occurs (e.g., pink flowers in snapdragons)."
+      },
+      {
+        question: "The law of independent assortment is applicable to genes located on:",
+        options: ["Same chromosome", "Non-homologous chromosomes", "Sex chromosomes", "Mitochondrial DNA"],
+        answer: 1,
+        explanation: "Independent assortment applies to genes on different chromosomes (non-linked). Linked genes (same chromosome) violate this law."
+      },
+      {
+        question: "Sickle-cell anemia is caused by a mutation in the gene coding for:",
+        options: ["Alpha-globin chain", "Beta-globin chain", "Hemoglobinase enzyme", "Iron transport protein"],
+        answer: 1,
+        explanation: "Sickle-cell anemia results from a point mutation in the β-globin gene (Glu → Val at position 6)."
+      },
+      {
+        question: "The 'transforming principle' in Griffith's experiment was later identified as:",
+        options: ["Protein", "DNA", "RNA", "Polysaccharide"],
+        answer: 1,
+        explanation: "Griffith's experiment (1928) showed bacterial transformation. Avery, MacLeod & McCarty (1944) proved DNA is the transforming material."
+      },
+      {
+        question: "In DNA replication, the Okazaki fragments are synthesized on the:",
+        options: ["Leading strand", "Lagging strand", "Both strands", "Template strand"],
+        answer: 1,
+        explanation: "Okazaki fragments are short DNA segments on the lagging strand (synthesized discontinuously in 5'→3' direction)."
+      },
+      {
+        question: "The Human Genome Project was completed in:",
+        options: ["1990", "2000", "2003", "2010"],
+        answer: 2,
+        explanation: "The draft was released in 2000, but the complete sequence was achieved in April 2003."
+      },
+      {
+        question: "Which enzyme is responsible for transcription in eukaryotes?",
+        options: ["DNA polymerase", "RNA polymerase II", "Reverse transcriptase", "Helicase"],
+        answer: 1,
+        explanation: "RNA polymerase II transcribes protein-coding genes (mRNA). RNA pol I (rRNA) and III (tRNA) have other roles."
+      },
+      {
+        question: "The sequence of DNA that codes for a functional product is called:",
+        options: ["Intron", "Exon", "Cistron", "Muton"],
+        answer: 2,
+        explanation: "A cistron is a DNA segment coding for a polypeptide. Exons are coding sequences, but cistron refers to the functional unit."
+      },
+      {
+        question: "The Wobble hypothesis explains:",
+        options: ["DNA replication errors", "Flexibility in tRNA-mRNA pairing", "Transcription termination", "Post-translational modifications"],
+        answer: 1,
+        explanation: "The wobble hypothesis (Crick) states that the 3rd base of tRNA's anticodon can pair loosely with mRNA, allowing 1 tRNA to recognize multiple codons."
+      },
+      {
+        question: "Which of the following provides direct evidence for evolution?",
+        options: ["Homologous organs", "Fossils", "Analogous organs", "Vestigial organs"],
+        answer: 1,
+        explanation: "Fossils are the most direct evidence of evolution as they show extinct species and transitional forms (e.g., Archaeopteryx)."
+      },
+      {
+        question: "Industrial melanism in peppered moths is an example of:",
+        options: ["Natural selection", "Artificial selection", "Genetic drift", "Mutation"],
+        answer: 0,
+        explanation: "Dark-colored moths survived better in polluted areas (directional selection), proving natural selection in action."
+      },
+      {
+        question: "The 'Miller-Urey experiment' demonstrated:",
+        options: ["Origin of life from inorganic matter", "Formation of coacervates", "RNA as the first genetic material", "Cosmic origin of life"],
+        answer: 0,
+        explanation: "Miller-Urey (1953) simulated early Earth conditions and produced amino acids, supporting chemical evolution."
+      },
+      {
+        question: "Adaptive radiation is best exemplified by:",
+        options: ["Darwin's finches", "Human evolution", "Industrial melanism", "Hardy-Weinberg equilibrium"],
+        answer: 0,
+        explanation: "Darwin's finches in the Galapagos show adaptive radiation—diversification from a common ancestor into varied niches."
+      },
+      {
+        question: "The Hardy-Weinberg principle requires all of the following conditions EXCEPT:",
+        options: ["No mutation", "Random mating", "Small population size", "No natural selection"],
+        answer: 2,
+        explanation: "Hardy-Weinberg equilibrium requires a large population (small populations experience genetic drift)."
+      },
+      {
+        question: "Vestigial organs in humans include:",
+        options: ["Appendix and wisdom teeth", "Liver and pancreas", "Heart and lungs", "Kidneys and spleen"],
+        answer: 0,
+        explanation: "Appendix (digestive role in herbivores) and wisdom teeth are vestigial. Other organs are functional."
+      },
+      {
+        question: "Which of the following is an autoimmune disease?",
+        options: ["Malaria", "Rheumatoid arthritis", "Cholera", "Tuberculosis"],
+        answer: 1,
+        explanation: "Rheumatoid arthritis is caused by the immune system attacking joint tissues. Malaria, cholera, and TB are infectious diseases."
+      },
+      {
+        question: "The Plasmodium parasite is transmitted by:",
+        options: ["Male Anopheles mosquito", "Female Anopheles mosquito", "Aedes aegypti", "Housefly"],
+        answer: 1,
+        explanation: "Only female Anopheles mosquitoes transmit malaria (they require blood meals for egg development)."
+      },
+      {
+        question: "Histamine is released during allergic reactions by:",
+        options: ["Mast cells", "Macrophages", "T-lymphocytes", "Red blood cells"],
+        answer: 0,
+        explanation: "Mast cells release histamine, causing allergy symptoms (itching, swelling). Antihistamines block this response."
+      },
+      {
+        question: "Which cancer is associated with the Epstein-Barr virus (EBV)?",
+        options: ["Lung cancer", "Cervical cancer", "Burkitt's lymphoma", "Leukemia"],
+        answer: 2,
+        explanation: "EBV is linked to Burkitt's lymphoma (a B-cell cancer). HPV causes cervical cancer, and smoking causes lung cancer."
+      },
+      {
+        question: "Widal test is used to diagnose:",
+        options: ["Typhoid", "Malaria", "AIDS", "Tuberculosis"],
+        answer: 0,
+        explanation: "The Widal test detects antibodies against Salmonella typhi (typhoid). Malaria uses blood smear, AIDS uses ELISA/Western blot."
+      },
+      {
+        question: "Ascariasis is caused by:",
+        options: ["Ascaris lumbricoides (roundworm)", "Taenia solium (tapeworm)", "Plasmodium (protozoan)", "Entamoeba histolytica (amoeba)"],
+        answer: 0,
+        explanation: "Ascariasis is a roundworm infection (Ascaris lumbricoides). Symptoms include abdominal pain and malnutrition."
+      },
+      {
+        question: "Which microorganism is used to produce statin drugs for lowering cholesterol?",
+        options: ["Lactobacillus", "Aspergillus terreus", "Saccharomyces cerevisiae", "Penicillium notatum"],
+        answer: 1,
+        explanation: "Statins (e.g., Lovastatin) are produced by the fungus Aspergillus terreus. They inhibit cholesterol synthesis in humans."
+      },
+      {
+        question: "Swiss cheese gets its characteristic holes due to the action of:",
+        options: ["Lactobacillus", "Propionibacterium shermanii", "Streptococcus thermophilus", "Acetobacter aceti"],
+        answer: 1,
+        explanation: "Propionibacterium shermanii releases CO₂ during fermentation, creating holes in Swiss cheese."
+      },
+      {
+        question: "Which bacterium is used as a biofertilizer for legumes?",
+        options: ["Azotobacter", "Rhizobium", "Nostoc", "Bacillus thuringiensis"],
+        answer: 1,
+        explanation: "Rhizobium forms root nodules in legumes and fixes atmospheric nitrogen (N₂ → NH₃)."
+      },
+      {
+        question: "Biogas production primarily involves:",
+        options: ["Aerobic bacteria", "Methanogenic archaea", "Cyanobacteria", "Yeast"],
+        answer: 1,
+        explanation: "Methanogens (e.g., Methanobacterium) convert organic waste into methane (CH₄) in biogas plants."
+      },
+      {
+        question: "The 'Roquefort cheese' is ripened using:",
+        options: ["Penicillium roqueforti", "Aspergillus niger", "Trichoderma polysporum", "Clostridium butylicum"],
+        answer: 0,
+        explanation: "Penicillium roqueforti gives Roquefort cheese its blue veins and distinct flavor."
+      },
+      {
+        question: "Which microbe is used in bioremediation of oil spills?",
+        options: ["Pseudomonas putida", "Bacillus subtilis", "Escherichia coli", "Streptomyces griseus"],
+        answer: 0,
+        explanation: "Pseudomonas putida degrades hydrocarbons in oil spills. It is a genetically engineered 'superbug.'"
+      },
+      {
+        question: "The 'ori' site in a plasmid is essential for:",
+        options: ["Antibiotic resistance", "DNA replication", "Gene insertion", "Protein synthesis"],
+        answer: 1,
+        explanation: "The origin of replication (ori) is where DNA replication begins. Without ori, the plasmid cannot replicate in the host cell."
+      },
+      {
+        question: "Which enzyme is used to cut DNA at specific sequences?",
+        options: ["DNA ligase", "Restriction endonuclease", "DNA polymerase", "Reverse transcriptase"],
+        answer: 1,
+        explanation: "Restriction enzymes (e.g., EcoRI) cut DNA at specific palindromic sequences, producing sticky or blunt ends."
+      },
+      {
+        question: "The polymerase chain reaction (PCR) requires all of the following EXCEPT:",
+        options: ["DNA template", "Primers", "Restriction enzymes", "Thermostable DNA polymerase"],
+        answer: 2,
+        explanation: "PCR needs Taq polymerase, primers, dNTPs, and a thermal cycler. Restriction enzymes are used in gene cloning, not PCR."
+      },
+      {
+        question: "Electroporation is a method used for:",
+        options: ["DNA sequencing", "Gene transfer into host cells", "Protein purification", "DNA fingerprinting"],
+        answer: 1,
+        explanation: "Electroporation uses electric pulses to create temporary pores in cell membranes for DNA uptake."
+      },
+      {
+        question: "The selectable marker in pBR322 plasmid is:",
+        options: ["lacZ gene", "ampᵣ and tetᵣ genes", "ori site", "Promoter"],
+        answer: 1,
+        explanation: "pBR322 has ampicillin (ampᵣ) and tetracycline (tetᵣ) resistance genes to screen transformed bacteria."
+      },
+      {
+        question: "Gel electrophoresis separates DNA fragments based on:",
+        options: ["Charge", "Size", "Sequence", "Color"],
+        answer: 1,
+        explanation: "DNA migrates toward the anode, with smaller fragments moving faster through the agarose gel."
+      },
+      {
+        question: "The Ti plasmid is used to transfer genes into:",
+        options: ["Animal cells", "Plant cells", "Bacteria", "Fungi"],
+        answer: 1,
+        explanation: "Ti plasmid (from Agrobacterium tumefaciens) is a natural vector for plant genetic engineering."
+      },
+      {
+        question: "Southern blotting is used to detect:",
+        options: ["RNA", "DNA", "Proteins", "Carbohydrates"],
+        answer: 1,
+        explanation: "Southern blot identifies DNA sequences. Northern blot (RNA), Western blot (proteins)."
+      },
+      {
+        question: "The first human hormone produced using recombinant DNA technology was:",
+        options: ["Insulin", "Growth hormone", "Thyroxine", "Estrogen"],
+        answer: 0,
+        explanation: "Human insulin (1983) was the first rDNA therapeutic, produced in E. coli."
+      },
+      {
+        question: "Gene gun is used for:",
+        options: ["DNA sequencing", "Transforming animal cells", "Delivering DNA into plant cells", "PCR amplification"],
+        answer: 2,
+        explanation: "The gene gun shoots gold/tungsten particles coated with DNA into plant cells (biolistics)."
+      },
+      {
+        question: "Golden Rice is genetically modified to produce:",
+        options: ["Vitamin A (β-carotene)", "Vitamin C", "Iron", "Calcium"],
+        answer: 0,
+        explanation: "Golden Rice contains genes from daffodil and bacteria to synthesize β-carotene (Vitamin A precursor), combating deficiency."
+      },
+      {
+        question: "The Bt toxin is produced by:",
+        options: ["Bacillus subtilis", "Bacillus thuringiensis", "Agrobacterium tumefaciens", "Pseudomonas putida"],
+        answer: 1,
+        explanation: "Bt cotton has cry genes from Bacillus thuringiensis that produce insecticidal proteins against bollworms."
+      },
+      {
+        question: "RNA interference (RNAi) is used to:",
+        options: ["Amplify DNA", "Silence specific genes", "Clone genes", "Sequence genomes"],
+        answer: 1,
+        explanation: "RNAi uses siRNA/miRNA to degrade target mRNA, blocking gene expression (e.g., pest-resistant crops)."
+      },
+      {
+        question: "The first transgenic cow produced milk containing:",
+        options: ["Human insulin", "Human growth hormone", "Human alpha-lactalbumin", "Blood clotting factor VIII"],
+        answer: 2,
+        explanation: "Rosie (1997) produced human alpha-lactalbumin-enriched milk, more nutritious for infants."
+      },
+      {
+        question: "ELISA detects:",
+        options: ["DNA mutations", "Antigen-antibody interactions", "RNA sequences", "Protein folding"],
+        answer: 1,
+        explanation: "ELISA (Enzyme-Linked Immunosorbent Assay) detects proteins/pathogens (e.g., HIV, pregnancy tests) via antibodies."
+      },
+      {
+        question: "CRISPR-Cas9 is a tool for:",
+        options: ["DNA sequencing", "Gene editing", "Protein synthesis", "Cell culture"],
+        answer: 1,
+        explanation: "CRISPR-Cas9 is a genome editing system that cuts DNA at specific sites using guide RNA."
+      },
+      {
+        question: "Gene therapy for ADA deficiency involves:",
+        options: ["Injecting ADA enzyme", "Bone marrow transplantation", "Introducing functional ADA gene into lymphocytes", "Oral antibiotics"],
+        answer: 2,
+        explanation: "SCID patients receive functional ADA gene via retroviral vectors into lymphocytes or stem cells."
+      },
+      {
+        question: "Hirudin is produced in transgenic:",
+        options: ["Sheep", "E. coli", "Brassica napus (mustard)", "Tobacco"],
+        answer: 3,
+        explanation: "Hirudin (blood anticoagulant) is produced in transgenic tobacco using Hirudo medicinalis (leech) gene."
+      },
+      {
+        question: "Bt brinjal resists:",
+        options: ["Fruit borer", "Aphids", "Whiteflies", "Bollworms"],
+        answer: 0,
+        explanation: "Bt brinjal contains cry1Ac gene to resist fruit and shoot borer (Leucinodes orbonalis)."
+      },
+      {
+        question: "Molecular diagnosis of HIV uses:",
+        options: ["PCR", "Western blot", "Both (A) and (B)", "MRI"],
+        answer: 2,
+        explanation: "HIV is diagnosed via PCR (detects viral RNA) and Western blot (confirms antibodies)."
+      },
+      {
+        question: "Transgenic mice are used to study:",
+        options: ["Human diseases", "Plant growth", "Bacterial resistance", "Viral replication"],
+        answer: 0,
+        explanation: "Knockout mice model human diseases (e.g., cancer, Alzheimer's) by disabling specific genes."
+      },
+      {
+        question: "A population with equal birth and death rates shows:",
+        options: ["Exponential growth", "Declining growth", "Zero population growth", "Logistic growth"],
+        answer: 2,
+        explanation: "When birth rate = death rate, r (growth rate) = 0, leading to zero population growth."
+      },
+      {
+        question: "Mutualism is best exemplified by:",
+        options: ["Lichen (algae + fungus)", "Cuckoo laying eggs in crow's nest", "Tapeworm in human intestine", "Tiger eating a deer"],
+        answer: 0,
+        explanation: "Lichen shows obligate mutualism—algae (photosynthesis) + fungus (shelter/minerals). Cuckoo is brood parasitism."
+      },
+      {
+        question: "The logistic growth equation is:",
+        options: ["dN/dt = rN", "dN/dt = rN[(K-N)/K]", "dN/dt = rN[K/(K-N)]", "dN/dt = rN²"],
+        answer: 1,
+        explanation: "Logistic growth accounts for carrying capacity (K): dN/dt = rN[(K-N)/K]."
+      },
+      {
+        question: "Allen's rule states that mammals in colder climates have:",
+        options: ["Larger body size", "Shorter extremities", "Thicker fur", "Darker skin"],
+        answer: 1,
+        explanation: "Allen's rule: Reduced ear/tail length minimizes heat loss in cold climates (e.g., Arctic fox)."
+      },
+      {
+        question: "Gause's competitive exclusion principle states that:",
+        options: ["Two species cannot coexist indefinitely", "Predators control prey populations", "Mutualists evolve together", "Parasites harm hosts"],
+        answer: 0,
+        explanation: "Two species with identical niches cannot coexist—one will outcompete the other."
+      },
+      {
+        question: "Ecotone refers to:",
+        options: ["A stable climax community", "Transition zone between two biomes", "Genetic drift in small populations", "Nutrient cycling in ecosystems"],
+        answer: 1,
+        explanation: "Ecotones are transitional zones (e.g., mangrove between terrestrial and marine ecosystems)."
+      },
+      {
+        question: "r-selected species are characterized by:",
+        options: ["Low reproductive rate", "Long lifespan", "Early reproduction", "High parental care"],
+        answer: 2,
+        explanation: "r-strategists (e.g., bacteria, insects) produce many offspring quickly with minimal care."
+      },
+      {
+        question: "Biome with maximum biodiversity is:",
+        options: ["Tundra", "Tropical rainforest", "Desert", "Taiga"],
+        answer: 1,
+        explanation: "Tropical rainforests (near equator) have high rainfall, temperature, and species diversity."
+      },
+      {
+        question: "Parasitism differs from predation in that parasites:",
+        options: ["Kill the host immediately", "Are always smaller than the host", "Do not harm the host", "Live on/in host for prolonged periods"],
+        answer: 3,
+        explanation: "Parasites (e.g., tapeworms) derive nutrients without immediately killing the host."
+      },
+      {
+        question: "Aposematic coloration is seen in:",
+        options: ["Stick insects", "Monarch butterflies", "Arctic hares", "Chameleons"],
+        answer: 1,
+        explanation: "Bright colors (e.g., Monarch butterfly) warn predators of toxicity (chemical defense)."
+      },
+      {
+        question: "Age pyramid of a declining population is:",
+        options: ["Broad base, narrow top", "Narrow base, broad top", "Uniform width", "Inverted"],
+        answer: 1,
+        explanation: "Narrow base (few young) + broad top (many elderly) indicates declining growth (e.g., Japan)."
+      },
+      {
+        question: "The ultimate source of energy in an ecosystem is:",
+        options: ["Sun", "Producers", "Consumers", "Decomposers"],
+        answer: 0,
+        explanation: "All energy flows from the sun → captured by producers (plants) via photosynthesis."
+      },
+      {
+        question: "Primary productivity is highest in:",
+        options: ["Deserts", "Grasslands", "Tropical rainforests", "Open oceans"],
+        answer: 2,
+        explanation: "Tropical rainforests have maximum NPP (Net Primary Productivity) due to optimal temperature, rainfall, and sunlight."
+      },
+      {
+        question: "Detritus food chain starts with:",
+        options: ["Green plants", "Dead organic matter", "Herbivores", "Carnivores"],
+        answer: 1,
+        explanation: "Detritus chain begins with dead organic material (e.g., leaf litter) → decomposed by microbes/fungi."
+      },
+      {
+        question: "10% law of energy transfer was given by:",
+        options: ["Darwin", "Lindeman", "Odum", "Haeckel"],
+        answer: 1,
+        explanation: "Raymond Lindeman proposed that only ~10% energy transfers between trophic levels (rest lost as heat)."
+      },
+      {
+        question: "Humboldt's rule states that biodiversity increases:",
+        options: ["Near the equator", "Near the poles", "With altitude", "In deserts"],
+        answer: 0,
+        explanation: "Latitudinal diversity gradient: Species richness peaks near the equator (tropical regions)."
+      },
+      {
+        question: "Keystone species in an ecosystem is one that:",
+        options: ["Has the most biomass", "Is the top predator", "Has a disproportionate impact on stability", "Is the most abundant"],
+        answer: 2,
+        explanation: "Keystone species (e.g., sea otters, wolves) maintain ecosystem balance disproportionately to their abundance."
+      },
+      {
+        question: "Nitrogen fixation is performed by:",
+        options: ["Nitrosomonas", "Rhizobium", "Pseudomonas", "Nostoc"],
+        answer: 1,
+        explanation: "Rhizobium (in legume root nodules) converts atmospheric N₂ → NH₃. Nostoc (cyanobacteria) also fixes nitrogen."
+      },
+      {
+        question: "Eutrophication is caused by excess:",
+        options: ["CO₂", "Phosphates/Nitrates", "Heavy metals", "Oxygen"],
+        answer: 1,
+        explanation: "Excess phosphates/nitrates (from fertilizers) cause algal blooms → oxygen depletion → dead zones."
+      },
+      {
+        question: "Pioneer species in primary succession are:",
+        options: ["Lichens", "Grasses", "Shrubs", "Trees"],
+        answer: 0,
+        explanation: "Lichens break bare rock into soil, enabling mosses/grasses to colonize later."
+      },
+      {
+        question: "Standing crop refers to:",
+        options: ["Total biomass at a trophic level", "Energy flow in a food chain", "Rate of decomposition", "Nutrient cycling"],
+        answer: 0,
+        explanation: "Standing crop = living biomass (g/m² or kg/m²) at a given time (e.g., 200 kg/ha of grass)."
+      },
+      {
+        question: "Ozone layer depletion is caused by:",
+        options: ["CO₂", "CFCs", "Methane", "Nitrous oxide"],
+        answer: 1,
+        explanation: "Chlorofluorocarbons (CFCs) release chlorine radicals that destroy ozone (O₃) in the stratosphere."
+      },
+      {
+        question: "The 'Evil Quartet' of biodiversity loss includes all EXCEPT:",
+        options: ["Habitat loss", "Overexploitation", "Climate change", "Co-extinctions"],
+        answer: 2,
+        explanation: "The Evil Quartet (Jared Diamond) includes: Habitat loss (major cause), Overexploitation (e.g., hunting), Invasive species, Co-extinctions. Climate change is a modern threat, not part of the original quartet."
+      },
+      {
+        question: "Biodiversity hotspots must meet which criteria?",
+        options: ["≥0.5% endemic plants + ≥70% habitat loss", "≥1,500 endemic plants + ≥30% habitat loss", "≥5,000 total species + ≥50% habitat loss", "≥10% endemic animals + ≥90% habitat loss"],
+        answer: 1,
+        explanation: "Hotspots require: ≥1,500 endemic vascular plants and ≤30% intact habitat (i.e., ≥70% lost). Examples: Western Ghats, Sundaland."
+      },
+      {
+        question: "The Red Data Book categorizes species as:",
+        options: ["Endangered, Vulnerable, Rare, Extinct", "Predator, Prey, Producer, Decomposer", "Terrestrial, Aquatic, Aerial, Arboreal", "Endemic, Exotic, Invasive, Keystone"],
+        answer: 0,
+        explanation: "IUCN Red List categories: Extinct (EX), Critically Endangered (CR), Endangered (EN), Vulnerable (VU), Near Threatened (NT), Least Concern (LC)."
+      },
+      {
+        question: "Keoladeo National Park is famous for:",
+        options: ["Tigers", "Migratory birds", "Rhinoceros", "Lions"],
+        answer: 1,
+        explanation: "Keoladeo (Bharatpur), Rajasthan is a UNESCO site for Siberian crane and other migratory birds."
+      },
+      {
+        question: "Project Tiger was launched in:",
+        options: ["1951", "1973", "1991", "2001"],
+        answer: 1,
+        explanation: "Project Tiger (1973) aims to conserve tigers in reserves like Corbett, Bandipur, and Ranthambore."
+      },
+      {
+        question: "Ex situ conservation includes:",
+        options: ["National parks", "Seed banks", "Sacred groves", "Wildlife corridors"],
+        answer: 1,
+        explanation: "Ex situ = Conservation outside natural habitat: Seed banks (e.g., Svalbard Global Seed Vault), Zoos, botanical gardens, Cryopreservation."
+      },
+      {
+        question: "Ramsar Convention protects:",
+        options: ["Deserts", "Wetlands", "Forests", "Coral reefs"],
+        answer: 1,
+        explanation: "Ramsar Convention (1971) conserves wetlands (e.g., Chilika Lake, Sundarbans). India has 75+ Ramsar sites."
+      },
+      {
+        question: "Endemic species of the Western Ghats include:",
+        options: ["Bengal tiger", "Nilgiri tahr", "Indian rhinoceros", "Snow leopard"],
+        answer: 1,
+        explanation: "Nilgiri tahr is endemic to the Western Ghats. Others: Lion-tailed macaque, Malabar giant squirrel."
+      },
+      {
+        question: "Chipko Movement was initiated to protect:",
+        options: ["Tigers", "Forests", "Wetlands", "Grasslands"],
+        answer: 1,
+        explanation: "Chipko Movement (1973) in Uttarakhand involved hugging trees to prevent deforestation by contractors."
+      }
+    ];
+
+    let currentQuestion = 0;
+    let userResponses = Array(quiz.length).fill(null);
+    let testSubmitted = false;
+    let testStarted = false;
+    let timeLeft = 60 * 60; // 60 minutes in seconds
+    let timerInterval;
+    let selectedOptionIndex = null;
+    let quizState = JSON.parse(localStorage.getItem('quizState')) || null;
+
+    // Check for saved state on page load
+    window.onload = function() {
+      if (quizState) {
+        if (confirm("We found an unfinished test. Do you want to continue where you left off?")) {
+          loadSavedState();
+        } else {
+          localStorage.removeItem('quizState');
+        }
+      }
+    };
+
+    // Hide welcome screen after 5 seconds
+    setTimeout(() => {
+      document.getElementById('welcome-screen').style.display = 'none';
+    }, 5000);
+
+    function loadSavedState() {
+      currentQuestion = quizState.currentQuestion;
+      userResponses = quizState.userResponses;
+      timeLeft = quizState.timeLeft;
+      testStarted = true;
+      
+      document.getElementById("intro-screen").style.display = "none";
+      document.querySelector(".timer").style.display = "flex";
+      document.getElementById("quiz-box").style.display = "block";
+      startTimer();
+      renderQuestion();
+      renderQuestionNav();
+    }
+
+    function saveState() {
+      const state = {
+        currentQuestion,
+        userResponses,
+        timeLeft,
+        testStarted: true
+      };
+      localStorage.setItem('quizState', JSON.stringify(state));
+    }
+
+    function startQuiz() {
+      document.getElementById("intro-screen").style.display = "none";
+      document.querySelector(".timer").style.display = "flex";
+      document.getElementById("quiz-box").style.display = "block";
+      startTimer();
+      renderQuestion();
+      renderQuestionNav();
+      testStarted = true;
+      saveState();
+    }
+
+    function startTimer() {
+      const timerDisplay = document.getElementById("timer");
+      updateTimerDisplay(timerDisplay);
+      
+      timerInterval = setInterval(() => {
+        timeLeft--;
+        updateTimerDisplay(timerDisplay);
+        saveState();
+        
+        if (timeLeft <= 0) {
+          clearInterval(timerInterval);
+          submitTest();
+        }
+      }, 1000);
+    }
+
+    function updateTimerDisplay(timerDisplay) {
+      const minutes = Math.floor(timeLeft / 60);
+      const seconds = timeLeft % 60;
+      timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      
+      if (timeLeft <= 300) { // 5 minutes or less
+        timerDisplay.parentElement.style.background = "#ffdddd";
+        timerDisplay.parentElement.style.color = "#dc3545";
+      }
+    }
+
+    function renderQuestion() {
+      const question = quiz[currentQuestion];
+      document.getElementById("question-text").textContent = `${currentQuestion + 1}. ${question.question}`;
+      
+      const optionsContainer = document.getElementById("options");
+      optionsContainer.innerHTML = "";
+      
+      question.options.forEach((option, index) => {
+        const optionElement = document.createElement("div");
+        optionElement.className = "option";
+        
+        // Add icon span
+        const iconSpan = document.createElement("span");
+        iconSpan.className = "option-icon";
+        optionElement.appendChild(iconSpan);
+        
+        // Add option text
+        optionElement.appendChild(document.createTextNode(option));
+        
+        if (userResponses[currentQuestion] === index) {
+          optionElement.classList.add("selected");
+        }
+        
+        // In review mode, show correct/incorrect answers
+        if (testSubmitted) {
+          if (index === question.answer) {
+            optionElement.classList.add("correct-answer");
+            iconSpan.innerHTML = '<i class="fas fa-check-circle"></i>';
+          } else if (userResponses[currentQuestion] === index && userResponses[currentQuestion] !== question.answer) {
+            optionElement.classList.add("incorrect");
+            iconSpan.innerHTML = '<i class="fas fa-times-circle"></i>';
+          }
+        }
+        
+        optionElement.onclick = () => {
+          if (!testSubmitted) {
+            selectedOptionIndex = index;
+            document.getElementById('confirmation-dialog').style.display = 'flex';
+          }
+        };
+        optionsContainer.appendChild(optionElement);
+      });
+      
+      // Show explanation only in review mode for current question
+      const explanationEl = document.getElementById("explanation");
+      const explanationText = document.getElementById("explanation-text");
+      if (testSubmitted) {
+        explanationEl.style.display = "block";
+        explanationText.textContent = quiz[currentQuestion].explanation;
+      } else {
+        explanationEl.style.display = "none";
+        explanationText.textContent = "";
+      }
+    }
+
+    function confirmSelection() {
+      userResponses[currentQuestion] = selectedOptionIndex;
+      document.getElementById('confirmation-dialog').style.display = 'none';
+      renderQuestion();
+      renderQuestionNav();
+      saveState();
+    }
+
+    function cancelSelection() {
+      document.getElementById('confirmation-dialog').style.display = 'none';
+      selectedOptionIndex = null;
+    }
+
+    function renderQuestionNav() {
+      const navContainer = document.getElementById("question-nav");
+      navContainer.innerHTML = "";
+      
+      quiz.forEach((question, index) => {
+        const navButton = document.createElement("div");
+        navButton.className = "q-nav-btn";
+        navButton.textContent = index + 1;
+        
+        if (testSubmitted) {
+          if (userResponses[index] === question.answer) {
+            navButton.classList.add("correct");
+          } else if (userResponses[index] !== null) {
+            navButton.classList.add("incorrect");
+          } else {
+            navButton.classList.add("unattempted");
+          }
+        } else {
+          navButton.classList.add(userResponses[index] === null ? "unattempted" : "answered");
+        }
+        
+        navButton.onclick = () => {
+          currentQuestion = index;
+          renderQuestion();
+        };
+        navContainer.appendChild(navButton);
+      });
+    }
+
+    function toggleQuestionNav() {
+      const nav = document.getElementById("question-nav");
+      nav.classList.toggle("active");
+    }
+
+    function prevQuestion() {
+      if (currentQuestion > 0) {
+        currentQuestion--;
+        renderQuestion();
+      }
+    }
+
+    function nextQuestion() {
+      if (currentQuestion < quiz.length - 1) {
+        currentQuestion++;
+        renderQuestion();
+      }
+    }
+
+    function confirmSubmit() {
+      if (confirm("Are you sure you want to end the test?")) {
+        submitTest();
+      }
+    }
+
+    function submitTest() {
+      clearInterval(timerInterval);
+      testSubmitted = true;
+      localStorage.removeItem('quizState');
+      
+      let correct = 0, wrong = 0, unattempted = 0;
+      
+      quiz.forEach((question, index) => {
+        if (userResponses[index] === null) {
+          unattempted++;
+        } else if (userResponses[index] === question.answer) {
+          correct++;
+        } else {
+          wrong++;
+        }
+      });
+      
+      // Calculate marks (+4 for correct, -1 for wrong)
+      const obtainedMarks = (correct * 4) - (wrong * 1);
+      
+      document.getElementById("quiz-box").style.display = "none";
+      document.querySelector(".timer").style.display = "none";
+      document.getElementById("correct-count").textContent = correct;
+      document.getElementById("wrong-count").textContent = wrong;
+      document.getElementById("unattempted-count").textContent = unattempted;
+      document.getElementById("obtained-marks").textContent = obtainedMarks.toFixed(2);
+      document.getElementById("summary").style.display = "block";
+    }
+
+    function reviewTest() {
+      document.getElementById("summary").style.display = "none";
+      document.getElementById("quiz-box").style.display = "block";
+      
+      // Render current question with correct/incorrect highlights
+      const question = quiz[currentQuestion];
+      const optionsContainer = document.getElementById("options");
+      optionsContainer.innerHTML = "";
+      
+      question.options.forEach((option, index) => {
+        const optionElement = document.createElement("div");
+        optionElement.className = "option";
+        
+        // Add icon span
+        const iconSpan = document.createElement("span");
+        iconSpan.className = "option-icon";
+        optionElement.appendChild(iconSpan);
+        
+        // Add option text
+        optionElement.appendChild(document.createTextNode(option));
+        
+        if (index === question.answer) {
+          optionElement.classList.add("correct-answer");
+          iconSpan.innerHTML = '<i class="fas fa-check-circle"></i>';
+        } else if (userResponses[currentQuestion] === index && userResponses[currentQuestion] !== question.answer) {
+          optionElement.classList.add("incorrect");
+          iconSpan.innerHTML = '<i class="fas fa-times-circle"></i>';
+        }
+        
+        optionsContainer.appendChild(optionElement);
+      });
+      
+      // Show explanation
+      document.getElementById("explanation").style.display = "block";
+      document.getElementById("explanation-text").textContent = question.explanation;
+      
+      // Update navigation buttons
+      renderQuestionNav();
+    }
+  </script>
+</body>
+</html>
