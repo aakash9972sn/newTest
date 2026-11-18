@@ -1,0 +1,621 @@
+/* ============================================================================
+   AAKASH Test Centre — engine
+   Data-driven: reads window.EXAM_DATA / window.QUESTION_BANKS from data.js.
+   Handles browsing, the test runner (timer, palette, marking, resume),
+   scoring and the solutions review. No dependencies, no build step.
+   ========================================================================== */
+(function () {
+  'use strict';
+
+  /* ------------------------------------------------------------------ utils */
+  const $ = (sel, root) => (root || document).querySelector(sel);
+  const $$ = (sel, root) => Array.prototype.slice.call((root || document).querySelectorAll(sel));
+  const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+  const esc = (v) => String(v).replace(/[&<>"']/g, (c) => ESC[c]);
+  const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+  const pad = (n) => String(n).padStart(2, '0');
+  const fmtTime = (s) => pad(Math.floor(s / 60)) + ':' + pad(s % 60);
+
+  const store = {
+    get(key, fallback) { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch (e) { return fallback; } },
+    set(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { /* storage full or blocked */ } },
+    del(key) { try { localStorage.removeItem(key); } catch (e) { /* ignore */ } }
+  };
+  const PKEY = (id) => 'tclab.progress.' + id;
+  const BKEY = (id) => 'tclab.best.' + id;
+  const RKEY = (id) => 'tclab.result.' + id;
+
+  /* ------------------------------------------------------------------ index */
+  const EXAMS = window.EXAM_DATA || [];
+  const BANKS = window.QUESTION_BANKS || {};
+  const TESTS = [];
+  EXAMS.forEach((exam) => exam.subjects.forEach((subject) => subject.tests.forEach((test) => {
+    TESTS.push({ test: test, exam: exam, subject: subject });
+  })));
+
+  const findEntry = (id) => TESTS.find((x) => x.test.id === id);
+  const questionsOf = (test) => {
+    if (test.questions) return test.questions;
+    const bank = BANKS[test.bank] || [];
+    const range = test.range || [0, bank.length];
+    return bank.slice(range[0], range[1]);
+  };
+  const markingOf = (test) => test.marking || { correct: 1, wrong: 0 };
+  const markLabel = (test) => {
+    const m = markingOf(test);
+    const neg = m.wrong ? '−' + (Math.round(m.wrong * 100) / 100) : '0';
+    return '+' + m.correct + ' / ' + neg;
+  };
+
+  /* --------------------------------------------------------- runner state */
+  let run = null;          // active attempt
+  let timerId = null;
+  let lastResult = null;   // in-memory mirror of the just-submitted result
+
+  /* ------------------------------------------------------------- navigation */
+  function go(hash) {
+    if (location.hash === hash) { route(); return; }
+    location.hash = hash;
+  }
+
+  function route() {
+    const hash = location.hash || '#/';
+    const tMatch = hash.match(/^#\/t\/(.+)$/);
+    const rMatch = hash.match(/^#\/r\/(.+)$/);
+    if (tMatch && findEntry(tMatch[1])) { openTest(findEntry(tMatch[1])); return; }
+    if (rMatch && findEntry(rMatch[1])) { showResult(findEntry(rMatch[1])); return; }
+    showHome();
+  }
+
+  function setScreen(name) {
+    ['home', 'test', 'result'].forEach((s) => {
+      const el = $('#screen-' + s);
+      if (el) el.hidden = (s !== name);
+    });
+    stopTimer();
+    window.scrollTo(0, 0);
+  }
+
+  /* ------------------------------------------------------------------- home */
+  let filterExam = 'all';
+  let filterSubject = 'all';
+  let searchTerm = '';
+
+  function progressOf(id) { return store.get(PKEY(id), null); }
+
+  function showHome() {
+    stopTimer();
+    run = null;
+    setScreen('home');
+    renderExamTabs();
+    renderSubjectChips();
+    renderResume();
+    renderCards();
+    renderHomeStats();
+  }
+
+  function renderHomeStats() {
+    const inProgress = TESTS.filter((x) => progressOf(x.test.id)).length;
+    const attempted = TESTS.filter((x) => store.get(BKEY(x.test.id), null)).length;
+    const subjectCount = EXAMS.reduce((n, e) => n + e.subjects.length, 0);
+    const questions = TESTS.reduce((n, x) => n + questionsOf(x.test).length, 0);
+    const stats = [
+      { v: TESTS.length, l: 'Tests' },
+      { v: subjectCount, l: 'Subjects' },
+      { v: questions, l: 'Questions' },
+      { v: attempted, l: 'Attempted' },
+      { v: inProgress, l: 'In progress' }
+    ];
+    $('#home-stats').innerHTML = stats.map((s) => '<div class="stat"><b>' + s.v + '</b><span>' + esc(s.l) + '</span></div>').join('');
+  }
+
+  function renderExamTabs() {
+    const tabs = [{ id: 'all', name: 'All exams' }].concat(EXAMS.map((e) => ({ id: e.id, name: e.name })));
+    $('#exam-tabs').innerHTML = tabs.map((t) => {
+      const active = t.id === filterExam ? ' is-active' : '';
+      const exam = EXAMS.find((e) => e.id === t.id);
+      const style = exam ? ' style="--tab-accent:' + exam.accent + '"' : '';
+      return '<button type="button" class="tab' + active + '" data-exam="' + esc(t.id) + '"' + style + '>' + esc(t.name) + '</button>';
+    }).join('');
+    $$('#exam-tabs .tab').forEach((btn) => btn.addEventListener('click', () => {
+      filterExam = btn.dataset.exam;
+      filterSubject = 'all';
+      renderExamTabs();
+      renderSubjectChips();
+      renderCards();
+    }));
+  }
+
+  function subjectsForFilter() {
+    const exams = filterExam === 'all' ? EXAMS : EXAMS.filter((e) => e.id === filterExam);
+    const out = [];
+    exams.forEach((e) => e.subjects.forEach((s) => out.push({ id: s.id, name: s.name, exam: e })));
+    return out;
+  }
+
+  function renderSubjectChips() {
+    const subs = subjectsForFilter();
+    const chips = [{ id: 'all', name: 'All subjects' }].concat(subs);
+    $('#subject-chips').innerHTML = chips.map((s) => {
+      const active = s.id === filterSubject ? ' is-active' : '';
+      return '<button type="button" class="chip' + active + '" data-subject="' + esc(s.id) + '">' + esc(s.name) + '</button>';
+    }).join('');
+    $$('#subject-chips .chip').forEach((btn) => btn.addEventListener('click', () => {
+      filterSubject = btn.dataset.subject;
+      renderSubjectChips();
+      renderCards();
+    }));
+  }
+
+  function renderResume() {
+    const items = TESTS.map((x) => ({ x: x, p: progressOf(x.test.id) })).filter((o) => o.p && o.p.responses);
+    const banner = $('#resume-banner');
+    if (!items.length) { banner.hidden = true; banner.innerHTML = ''; return; }
+    banner.hidden = false;
+    banner.innerHTML =
+      '<div class="resume-head"><span class="resume-dot" aria-hidden="true"></span> Pick up where you left off</div>' +
+      '<div class="resume-list">' + items.map((o) => {
+        const total = questionsOf(o.x.test).length;
+        const done = o.p.responses.filter((r) => r !== null && r !== undefined).length;
+        return '<a class="resume-item" href="#/t/' + esc(o.x.test.id) + '">' +
+          '<span class="resume-title">' + esc(o.x.test.title) + '</span>' +
+          '<span class="resume-meta">' + esc(o.x.subject.name) + ' · ' + done + '/' + total + ' answered</span>' +
+          '<span class="resume-go">Resume</span></a>';
+      }).join('') + '</div>';
+  }
+
+  function visibleTests() {
+    const term = searchTerm.trim().toLowerCase();
+    return TESTS.filter((x) => {
+      if (filterExam !== 'all' && x.exam.id !== filterExam) return false;
+      if (filterSubject !== 'all' && x.subject.id !== filterSubject) return false;
+      if (!term) return true;
+      const hay = (x.test.title + ' ' + x.subject.name + ' ' + x.exam.name + ' ' + (x.test.level || '')).toLowerCase();
+      return hay.indexOf(term) !== -1;
+    });
+  }
+
+  function renderCards() {
+    const list = visibleTests();
+    const grid = $('#test-grid');
+    const empty = $('#home-empty');
+    empty.hidden = list.length > 0;
+    grid.innerHTML = list.map((x) => cardHTML(x)).join('');
+    $$('.card', grid).forEach((card) => {
+      const id = card.dataset.id;
+      $$('a, button', card).forEach((el) => el.addEventListener('click', (ev) => {
+        if (el.tagName === 'A') return; // let the anchor navigate
+        ev.preventDefault();
+        go('#/t/' + id);
+      }));
+    });
+  }
+
+  function cardHTML(x) {
+    const test = x.test;
+    const qs = questionsOf(test).length;
+    const best = store.get(BKEY(test.id), null);
+    const prog = progressOf(test.id);
+    let status = '<span class="card-status">Not started</span>';
+    if (prog) {
+      const done = prog.responses.filter((r) => r !== null && r !== undefined).length;
+      status = '<span class="card-status is-progress">In progress · ' + done + '/' + qs + '</span>';
+    } else if (best) {
+      status = '<span class="card-status is-done">Best ' + best.score + '/' + best.total + '</span>';
+    }
+    const cta = prog ? 'Resume' : (best ? 'Retake' : 'Start test');
+    return '<article class="card" data-id="' + esc(test.id) + '" style="--card-accent:' + x.exam.accent + ';--card-accent2:' + x.exam.accent2 + '">' +
+      '<div class="card-tags"><span class="tag tag-exam">' + esc(x.exam.name) + '</span><span class="tag">' + esc(x.subject.name) + '</span>' +
+      (test.level ? '<span class="tag tag-level">' + esc(test.level) + '</span>' : '') + '</div>' +
+      '<h3 class="card-title">' + esc(test.title) + '</h3>' +
+      '<dl class="card-meta">' +
+      '<div><dt>Questions</dt><dd>' + qs + '</dd></div>' +
+      '<div><dt>Time</dt><dd>' + test.duration + ' min</dd></div>' +
+      '<div><dt>Marking</dt><dd>' + esc(markLabel(test)) + '</dd></div>' +
+      '</dl>' +
+      '<div class="card-foot">' + status +
+      '<a class="card-cta" href="#/t/' + esc(test.id) + '">' + cta + '<span aria-hidden="true">→</span></a>' +
+      '</div></article>';
+  }
+
+  /* ------------------------------------------------------------ test runner */
+  function openTest(entry) {
+    const test = entry.test;
+    const questions = questionsOf(test);
+    let prog = progressOf(test.id);
+    if (!prog || !prog.responses || prog.responses.length !== questions.length) {
+      prog = newAttempt(questions);
+    }
+    run = {
+      entry: entry,
+      test: test,
+      questions: questions,
+      responses: prog.responses.slice(),
+      marked: (prog.marked || []).slice(),
+      visited: (prog.visited || []).slice(),
+      current: clamp(prog.current || 0, 0, questions.length - 1),
+      timeLeft: typeof prog.timeLeft === 'number' ? prog.timeLeft : test.duration * 60,
+      total: test.duration * 60
+    };
+    if (run.marked.length !== questions.length) run.marked = questions.map(() => false);
+    if (run.visited.length !== questions.length) run.visited = questions.map(() => false);
+    setScreen('test');
+    buildRunnerChrome();
+    goToQuestion(run.current);
+    startTimer();
+  }
+
+  function newAttempt(questions) {
+    return {
+      responses: questions.map(() => null),
+      marked: questions.map(() => false),
+      visited: questions.map(() => false),
+      current: 0,
+      timeLeft: undefined
+    };
+  }
+
+  function saveProgress() {
+    if (!run) return;
+    store.set(PKEY(run.test.id), {
+      responses: run.responses,
+      marked: run.marked,
+      visited: run.visited,
+      current: run.current,
+      timeLeft: run.timeLeft,
+      updated: Date.now()
+    });
+  }
+
+  function buildRunnerChrome() {
+    $('#runner-title').textContent = run.test.title;
+    $('#runner-sub').textContent = run.entry.exam.name + ' · ' + run.entry.subject.name;
+    $('#runner-count').textContent = run.questions.length + ' questions';
+    $('#runner-marking').textContent = 'Marking ' + markLabel(run.test);
+    renderPalette();
+    updateProgressBar();
+    updateTimerText();
+  }
+
+  function startTimer() {
+    stopTimer();
+    updateTimerText();
+    timerId = setInterval(() => {
+      if (!run) return;
+      run.timeLeft--;
+      updateTimerText();
+      if (run.timeLeft % 5 === 0) saveProgress();
+      if (run.timeLeft <= 0) { stopTimer(); submit(true); }
+    }, 1000);
+  }
+  function stopTimer() { if (timerId) { clearInterval(timerId); timerId = null; } }
+
+  function updateTimerText() {
+    const el = $('#timer-text');
+    if (!el || !run) return;
+    el.textContent = fmtTime(Math.max(0, run.timeLeft));
+    const box = $('#runner-timer');
+    box.classList.toggle('is-low', run.timeLeft <= 300);
+    box.classList.toggle('is-critical', run.timeLeft <= 60);
+  }
+
+  function statusOf(i) {
+    const answered = run.responses[i] !== null && run.responses[i] !== undefined;
+    const marked = run.marked[i];
+    if (marked && answered) return 'answered-marked';
+    if (marked) return 'marked';
+    if (answered) return 'answered';
+    if (run.visited[i]) return 'seen';
+    return 'not-visited';
+  }
+
+  function renderPalette() {
+    const grid = $('#palette-grid');
+    grid.innerHTML = run.questions.map((q, i) => {
+      const st = statusOf(i);
+      const cur = i === run.current ? ' is-current' : '';
+      return '<button type="button" class="pcell is-' + st + cur + '" data-i="' + i + '" aria-label="Question ' + (i + 1) + '">' + (i + 1) + '</button>';
+    }).join('');
+    $$('#palette-grid .pcell').forEach((b) => b.addEventListener('click', () => {
+      goToQuestion(Number(b.dataset.i));
+      closePaletteOnMobile();
+    }));
+    const counts = { answered: 0, 'answered-marked': 0, marked: 0, seen: 0, 'not-visited': 0 };
+    run.questions.forEach((q, i) => { counts[statusOf(i)]++; });
+    $('#pal-answered').textContent = counts.answered + counts['answered-marked'];
+    $('#pal-marked').textContent = counts.marked + counts['answered-marked'];
+    $('#pal-unseen').textContent = counts['not-visited'] + counts.seen;
+  }
+
+  function updateProgressBar() {
+    const answered = run.responses.filter((r) => r !== null && r !== undefined).length;
+    const pct = Math.round((answered / run.questions.length) * 100);
+    $('#runner-progress-bar').style.width = pct + '%';
+    $('#runner-progress-text').textContent = answered + ' / ' + run.questions.length + ' answered';
+  }
+
+  function goToQuestion(i) {
+    run.current = clamp(i, 0, run.questions.length - 1);
+    run.visited[run.current] = true;
+    renderQuestion();
+    renderPalette();
+    updateProgressBar();
+    saveProgress();
+  }
+
+  function renderQuestion() {
+    const i = run.current;
+    const q = run.questions[i];
+    $('#q-index').textContent = 'Question ' + (i + 1) + ' of ' + run.questions.length;
+    $('#q-topic').textContent = q.t || '';
+    $('#q-text').textContent = q.q;
+    const letters = ['A', 'B', 'C', 'D', 'E', 'F'];
+    $('#q-options').innerHTML = q.o.map((opt, oi) => {
+      const selected = run.responses[i] === oi;
+      return '<button type="button" class="opt' + (selected ? ' is-selected' : '') + '" data-oi="' + oi + '">' +
+        '<span class="opt-key">' + letters[oi] + '</span><span class="opt-text">' + esc(opt) + '</span></button>';
+    }).join('');
+    $$('#q-options .opt').forEach((btn) => btn.addEventListener('click', () => selectOption(Number(btn.dataset.oi))));
+    $('#btn-mark').classList.toggle('is-on', !!run.marked[i]);
+    $('#btn-mark').setAttribute('aria-pressed', String(!!run.marked[i]));
+    $('#btn-prev').disabled = i === 0;
+    $('#btn-next').textContent = i === run.questions.length - 1 ? 'Review' : 'Save & Next';
+    $('#q-explanation').hidden = true;
+  }
+
+  function selectOption(oi) {
+    run.responses[run.current] = oi;
+    $$('#q-options .opt').forEach((btn) => btn.classList.toggle('is-selected', Number(btn.dataset.oi) === oi));
+    renderPalette();
+    updateProgressBar();
+    saveProgress();
+  }
+
+  function clearResponse() {
+    run.responses[run.current] = null;
+    $$('#q-options .opt').forEach((btn) => btn.classList.remove('is-selected'));
+    renderPalette();
+    updateProgressBar();
+    saveProgress();
+  }
+
+  function toggleMark() {
+    run.marked[run.current] = !run.marked[run.current];
+    $('#btn-mark').classList.toggle('is-on', run.marked[run.current]);
+    $('#btn-mark').setAttribute('aria-pressed', String(run.marked[run.current]));
+    renderPalette();
+    saveProgress();
+  }
+
+  function nextQuestion() {
+    if (run.current < run.questions.length - 1) goToQuestion(run.current + 1);
+    else askSubmit();
+  }
+  function prevQuestion() { if (run.current > 0) goToQuestion(run.current - 1); }
+
+  function paletteIsMobile() { return window.matchMedia('(max-width: 900px)').matches; }
+  function openPalette() { $('#palette').classList.add('is-open'); $('#palette-scrim').hidden = false; }
+  function closePalette() { $('#palette').classList.remove('is-open'); $('#palette-scrim').hidden = true; }
+  function closePaletteOnMobile() { if (paletteIsMobile()) closePalette(); }
+
+  /* ------------------------------------------------------------- submit flow */
+  function askSubmit() {
+    const answered = run.responses.filter((r) => r !== null && r !== undefined).length;
+    const marked = run.marked.filter(Boolean).length;
+    const total = run.questions.length;
+    modal({
+      title: 'Submit this test?',
+      body: '<p>You have answered <b>' + answered + '</b> of <b>' + total + '</b> questions.</p>' +
+        '<ul class="modal-stats">' +
+        '<li><span>Answered</span><b>' + answered + '</b></li>' +
+        '<li><span>Not answered</span><b>' + (total - answered) + '</b></li>' +
+        '<li><span>Marked for review</span><b>' + marked + '</b></li>' +
+        '</ul><p class="muted">Once submitted you cannot change your answers.</p>',
+      confirm: 'Yes, submit',
+      cancel: 'Keep working',
+      onConfirm: () => submit(false)
+    });
+  }
+
+  function submit(auto) {
+    stopTimer();
+    const m = markingOf(run.test);
+    let correct = 0, wrong = 0, unattempted = 0;
+    const topicStats = {};
+    run.questions.forEach((q, i) => {
+      const r = run.responses[i];
+      const topic = q.t || 'General';
+      if (!topicStats[topic]) topicStats[topic] = { correct: 0, wrong: 0, unattempted: 0, total: 0 };
+      topicStats[topic].total++;
+      if (r === null || r === undefined) { unattempted++; topicStats[topic].unattempted++; }
+      else if (r === q.a) { correct++; topicStats[topic].correct++; }
+      else { wrong++; topicStats[topic].wrong++; }
+    });
+    const score = Math.round((correct * m.correct - wrong * m.wrong) * 100) / 100;
+    const totalMarks = run.questions.length * m.correct;
+    const attempted = correct + wrong;
+    const accuracy = attempted ? Math.round((correct / attempted) * 100) : 0;
+    const timeUsed = run.total - Math.max(0, run.timeLeft);
+    const result = {
+      testId: run.test.id,
+      title: run.test.title,
+      exam: run.entry.exam.name,
+      subject: run.entry.subject.name,
+      score: score,
+      total: totalMarks,
+      correct: correct,
+      wrong: wrong,
+      unattempted: unattempted,
+      accuracy: accuracy,
+      timeUsed: timeUsed,
+      totalTime: run.total,
+      auto: !!auto,
+      responses: run.responses.slice(),
+      marked: run.marked.slice(),
+      topics: topicStats,
+      at: Date.now()
+    };
+    store.set(RKEY(run.test.id), result);
+    store.del(PKEY(run.test.id));
+    const prevBest = store.get(BKEY(run.test.id), null);
+    if (!prevBest || score > prevBest.score) store.set(BKEY(run.test.id), { score: score, total: totalMarks, at: Date.now() });
+    lastResult = result;
+    stopTimer();
+    run = null;
+    closePalette();
+    go('#/r/' + result.testId);
+  }
+
+  function exitTest() {
+    if (!run) { go('#/'); return; }
+    const answered = run.responses.filter((r) => r !== null && r !== undefined).length;
+    modal({
+      title: 'Leave the test?',
+      body: '<p>Your progress is saved, so you can resume later. You have answered <b>' + answered + '</b> of <b>' + run.questions.length + '</b>.</p>',
+      confirm: 'Save & exit',
+      cancel: 'Stay',
+      onConfirm: () => { saveProgress(); run = null; go('#/'); }
+    });
+  }
+
+  /* ---------------------------------------------------------------- results */
+  function showResult(entry) {
+    stopTimer();
+    setScreen('result');
+    const result = lastResult && lastResult.testId === entry.test.id ? lastResult : store.get(RKEY(entry.test.id), null);
+    if (!result) { go('#/'); return; }
+    const questions = questionsOf(entry.test);
+    const pct = result.total ? Math.round((Math.max(0, result.score) / result.total) * 100) : 0;
+    $('#result-body').innerHTML =
+      '<div class="result-head">' +
+      '<span class="result-exam" style="--card-accent:' + entry.exam.accent + '">' + esc(result.exam) + ' · ' + esc(result.subject) + '</span>' +
+      '<h2>' + esc(result.title) + '</h2>' +
+      (result.auto ? '<p class="result-auto">Time ran out — the test was submitted automatically.</p>' : '') +
+      '</div>' +
+      '<div class="result-score">' +
+      '<div class="score-ring" style="--pct:' + clamp(pct, 0, 100) + '"><span class="score-num">' + result.score + '</span><span class="score-of">/ ' + result.total + '</span></div>' +
+      '<div class="score-side">' +
+      scoreRow('Correct', result.correct, 'good') +
+      scoreRow('Wrong', result.wrong, 'bad') +
+      scoreRow('Unattempted', result.unattempted, 'neutral') +
+      scoreRow('Accuracy', result.accuracy + '%', 'accent') +
+      scoreRow('Time used', fmtTime(result.timeUsed) + ' / ' + fmtTime(result.totalTime), 'neutral') +
+      '</div></div>' +
+      '<div class="result-actions">' +
+      '<button type="button" class="btn btn-ghost" id="res-home">Back to tests</button>' +
+      '<button type="button" class="btn btn-ghost" id="res-retake">Retake test</button>' +
+      '<button type="button" class="btn btn-primary" id="res-review">Review solutions</button>' +
+      '</div>' +
+      (Object.keys(result.topics).length > 1 ? topicBreakdown(result.topics) : '');
+    $('#res-home').addEventListener('click', () => go('#/'));
+    $('#res-retake').addEventListener('click', () => { store.del(RKEY(result.testId)); go('#/t/' + result.testId); });
+    $('#res-review').addEventListener('click', () => { $('#solutions').hidden = false; $('#solutions').scrollIntoView({ behavior: 'smooth' }); });
+    renderSolutions(entry, result, questions);
+  }
+
+  function scoreRow(label, value, tone) {
+    return '<div class="score-row is-' + tone + '"><span>' + esc(label) + '</span><b>' + esc(value) + '</b></div>';
+  }
+
+  function topicBreakdown(topics) {
+    const rows = Object.keys(topics).map((name) => {
+      const t = topics[name];
+      const attempted = t.correct + t.wrong;
+      const acc = attempted ? Math.round((t.correct / attempted) * 100) : 0;
+      return '<div class="topic-row"><span class="topic-name">' + esc(name) + '</span>' +
+        '<span class="topic-bar"><i style="width:' + acc + '%"></i></span>' +
+        '<span class="topic-val">' + t.correct + '/' + t.total + '</span></div>';
+    }).join('');
+    return '<div class="topic-breakdown"><h3>Topic performance</h3>' + rows + '</div>';
+  }
+
+  let solutionFilter = 'all';
+  function renderSolutions(entry, result, questions) {
+    const wrap = $('#solutions');
+    wrap.hidden = false;
+    const filters = [
+      { id: 'all', label: 'All (' + questions.length + ')' },
+      { id: 'wrong', label: 'Wrong (' + result.wrong + ')' },
+      { id: 'correct', label: 'Correct (' + result.correct + ')' },
+      { id: 'skipped', label: 'Skipped (' + result.unattempted + ')' }
+    ];
+    wrap.innerHTML =
+      '<div class="solutions-head"><h2>Solutions &amp; explanations</h2>' +
+      '<div class="solution-filters">' + filters.map((f) => '<button type="button" class="chip' + (f.id === solutionFilter ? ' is-active' : '') + '" data-filter="' + f.id + '">' + esc(f.label) + '</button>').join('') + '</div></div>' +
+      '<div class="solution-list" id="solution-list"></div>';
+    $$('.solution-filters .chip').forEach((b) => b.addEventListener('click', () => {
+      solutionFilter = b.dataset.filter;
+      renderSolutions(entry, result, questions);
+    }));
+    const letters = ['A', 'B', 'C', 'D', 'E', 'F'];
+    const list = $('#solution-list');
+    questions.forEach((q, i) => {
+      const r = result.responses[i];
+      const state = (r === null || r === undefined) ? 'skipped' : (r === q.a ? 'correct' : 'wrong');
+      if (solutionFilter !== 'all' && solutionFilter !== state) return;
+      const badge = { correct: 'Correct', wrong: 'Wrong', skipped: 'Skipped' }[state];
+      const opts = q.o.map((opt, oi) => {
+        let cls = 'opt-static';
+        if (oi === q.a) cls += ' is-correct';
+        else if (oi === r) cls += ' is-wrong';
+        return '<div class="' + cls + '"><span class="opt-key">' + letters[oi] + '</span><span class="opt-text">' + esc(opt) + '</span></div>';
+      }).join('');
+      list.insertAdjacentHTML('beforeend',
+        '<details class="solution is-' + state + '"' + (solutionFilter !== 'all' ? ' open' : '') + '>' +
+        '<summary><span class="sol-num">' + (i + 1) + '</span><span class="sol-q">' + esc(q.q) + '</span><span class="sol-badge">' + badge + '</span></summary>' +
+        '<div class="sol-body"><div class="sol-opts">' + opts + '</div>' +
+        '<div class="sol-explain"><b>Explanation.</b> ' + esc(q.e || '—') + '</div></div></details>');
+    });
+    if (!list.children.length) list.innerHTML = '<p class="muted">Nothing to show for this filter.</p>';
+  }
+
+  /* ----------------------------------------------------------------- modal */
+  function modal(opts) {
+    const m = $('#modal');
+    m.hidden = false;
+    m.innerHTML =
+      '<div class="modal-card" role="dialog" aria-modal="true">' +
+      '<h3>' + esc(opts.title) + '</h3><div class="modal-body">' + opts.body + '</div>' +
+      '<div class="modal-actions">' +
+      '<button type="button" class="btn btn-ghost" id="modal-cancel">' + esc(opts.cancel || 'Cancel') + '</button>' +
+      '<button type="button" class="btn btn-primary" id="modal-confirm">' + esc(opts.confirm || 'Confirm') + '</button>' +
+      '</div></div>';
+    const close = () => { m.hidden = true; m.innerHTML = ''; };
+    $('#modal-cancel').addEventListener('click', close);
+    $('#modal-confirm').addEventListener('click', () => { close(); if (opts.onConfirm) opts.onConfirm(); });
+    m.addEventListener('click', (e) => { if (e.target === m) close(); }, { once: true });
+    $('#modal-confirm').focus();
+  }
+
+  /* ------------------------------------------------------------------- wire */
+  function wire() {
+    $('#search').addEventListener('input', (e) => { searchTerm = e.target.value; renderCards(); });
+    $('#btn-prev').addEventListener('click', prevQuestion);
+    $('#btn-next').addEventListener('click', () => { saveProgress(); nextQuestion(); });
+    $('#btn-clear').addEventListener('click', clearResponse);
+    $('#btn-mark').addEventListener('click', toggleMark);
+    $('#btn-submit').addEventListener('click', askSubmit);
+    $('#exit-test').addEventListener('click', exitTest);
+    $('#palette-open').addEventListener('click', openPalette);
+    $('#palette-close').addEventListener('click', closePalette);
+    $('#palette-scrim').addEventListener('click', closePalette);
+
+    document.addEventListener('keydown', (e) => {
+      if ($('#screen-test').hidden) return;
+      if (e.target.matches('input, textarea')) return;
+      const key = e.key;
+      if (/^[1-9]$/.test(key)) { const n = Number(key) - 1; if (run && n < run.questions[run.current].o.length) selectOption(n); }
+      else if (key === 'ArrowRight') { saveProgress(); nextQuestion(); }
+      else if (key === 'ArrowLeft') prevQuestion();
+      else if (key === 'm' || key === 'M') toggleMark();
+      else if (key === 'c' || key === 'C') clearResponse();
+    });
+
+    window.addEventListener('hashchange', route);
+    window.addEventListener('beforeunload', () => { if (run) saveProgress(); });
+  }
+
+  /* ------------------------------------------------------------------- boot */
+  wire();
+  route();
+})();
