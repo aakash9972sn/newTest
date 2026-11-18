@@ -29,6 +29,10 @@
 
 * { box-sizing: border-box; }
 
+/* Keep closed dialogs and inactive screens out of layout, even when their
+   component rules set display: grid or flex. */
+[hidden] { display: none !important; }
+
 html { scroll-behavior: smooth; }
 
 body {
