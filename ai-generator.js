@@ -162,6 +162,7 @@
       '<option value="2">2 different tests</option><option value="3">3 different tests</option></select></label>' +
       '<button type="submit" class="btn btn-primary" id="ai-gen-submit">Generate AI tests</button>' +
       '</form>' +
+      '<button type="button" class="ai-gen-diagnostic" id="ai-gen-diagnostic">Test AI connection (2 questions)</button>' +
       '<div class="ai-gen-job" id="ai-gen-job" hidden>' +
       '<div class="ai-gen-job-line"><span id="ai-gen-progress-label">Preparing…</span>' +
       '<button type="button" class="ai-gen-cancel" id="ai-gen-cancel">Cancel</button></div>' +
@@ -183,6 +184,39 @@
     const cancel = host.querySelector('#ai-gen-cancel');
     const controls = Array.from(form.querySelectorAll('input, select'));
     let activeController = null;
+    const diagnostic = host.querySelector('#ai-gen-diagnostic');
+    diagnostic.addEventListener('click', async () => {
+      if (activeController) return;
+      diagnostic.disabled = true;
+      status.dataset.state = 'progress';
+      status.textContent = 'Testing live AI inference with 2 questions…';
+      try {
+        await checkBackend();
+        const exam = exams.find((e) => e.id === examSelect.value);
+        const subject = exam?.subjects.find((s) => s.id === subjectSelect.value);
+        if (!subject) throw new Error('Choose a valid subject first.');
+        const started = Date.now();
+        const answer = await fetchWithDeadline(endpoint(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'generate', exam: exam.id, subject: subject.id,
+            topic: topicInput.value.trim(), difficulty: levelSelect.value,
+            count: 2, avoid: []
+          })
+        }, 45000);
+        validateGenerated(answer, 2, []);
+        status.dataset.state = 'success';
+        status.textContent = 'Live AI generated 2 valid-format questions in ' +
+          Math.round((Date.now() - started) / 1000) +
+          's. Now try Generate AI tests. This does not verify academic answer accuracy.';
+      } catch (error) {
+        status.dataset.state = 'error';
+        status.textContent = 'AI diagnostic failed: ' + (error?.message || 'Unknown error');
+      } finally {
+        diagnostic.disabled = false;
+      }
+    });
     cancel.addEventListener('click', () => {
       if (!activeController) return;
       cancel.disabled = true;

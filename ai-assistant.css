@@ -316,3 +316,12 @@ footer {
 .mark svg, .launcher svg { width: 24px; height: 24px; display: block; }
 .spark svg { width: 38px; height: 38px; display: block; }
 .send svg { width: 20px; height: 20px; display: block; margin: auto; }
+
+.google-search {
+  border: 0; background: none; cursor: pointer;
+  padding: 5px 0; color: var(--ink); font-size: 10px;
+  text-decoration: underline; white-space: nowrap;
+}
+.google-search:hover,.google-search:focus-visible {
+  color: #2432a3; outline-offset: 2px;
+}
