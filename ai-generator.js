@@ -88,6 +88,52 @@
     return accepted;
   }
 
+
+  async function fetchWithDeadline(url, options, ms) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), ms);
+    try {
+      const response = await fetch(url, { ...options, signal: controller.signal });
+      const body = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error((body && body.error) ||
+          ('AI server returned HTTP ' + response.status + '. Check Cloudflare deployments.'));
+      }
+      return body;
+    } catch (error) {
+      if (error && error.name === 'AbortError') {
+        throw new Error('AI request timed out. Check the Worker deployment and free AI quota, or retry a 5-question test.');
+      }
+      if (error instanceof TypeError) {
+        throw new Error('Cannot reach the Cloudflare Worker. Check its deployment, URL, and AI binding.');
+      }
+      throw error;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  async function checkBackend() {
+    const workerUrl = endpoint();
+    const healthUrl = workerUrl.replace(/\/$/, '') + '/health';
+    let health;
+    try {
+      health = await fetchWithDeadline(healthUrl, { method: 'GET' }, 12000);
+    } catch (error) {
+      if (error && /403|404|Not permitted/.test(error.message)) {
+        throw new Error('Cloudflare is using the old Worker code. Check Workers & Pages → aakash-test-ai → Deployments.');
+      }
+      throw error;
+    }
+    if (!health || health.ok !== true ||
+      !Array.isArray(health.features) || !health.features.includes('generate')) {
+      throw new Error('Cloudflare Worker needs the latest GitHub deployment. Check Workers & Pages → Deployments.');
+    }
+    if (!health.aiBinding) {
+      throw new Error('Cloudflare Worker is missing the Workers AI binding (name: AI).');
+    }
+  }
+
   function mount(exams, register, refresh) {
     const host = document.querySelector('#ai-generator');
     if (!host || host.dataset.ready) return;
@@ -147,27 +193,33 @@
       button.textContent = 'Generating…';
       let created = 0;
       try {
+        status.textContent = 'Checking Cloudflare AI connection…';
+        await checkBackend();
         for (let n = 0; n < batch; n++) {
-          status.textContent = 'Creating test ' + (n + 1) + ' of ' + batch +
-            '… Please keep this page open.';
-          const history = makeHistory(exam.id, subject.id, topic);
-          const response = await fetch(endpoint(), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              action: 'generate', exam: exam.id, subject: subject.id,
-              topic: topic, difficulty: difficulty, count: count,
-              avoid: history, batchIndex: n
-            })
-          });
-          const body = await response.json().catch(() => null);
-          if (!response.ok) throw new Error((body && body.error) || 'AI service unavailable (' + response.status + ').');
-          // Reject repeats against *all* locally saved questions, not only the
-          // short history sent to the model to keep free usage economical.
-          const allPrevious = loadSaved().filter((x) =>
-            x.examId === exam.id && x.subjectId === subject.id
-          ).flatMap((x) => x.test.questions.map((q) => q.q));
-          const questions = validateGenerated(body, count, allPrevious.concat(history));
+          const questions = [];
+          const chunks = count === 10 ? [5, 5] : [5];
+          for (let c = 0; c < chunks.length; c++) {
+            status.textContent = 'Generating test ' + (n + 1) + ' of ' + batch +
+              ', question batch ' + (c + 1) + ' of ' + chunks.length +
+              '… Each batch has a timeout so it cannot hang forever.';
+            const allPrevious = loadSaved().filter((x) =>
+              x.examId === exam.id && x.subjectId === subject.id
+            ).flatMap((x) => x.test.questions.map((q) => q.q));
+            const history = makeHistory(exam.id, subject.id, topic)
+              .concat(questions.map((q) => q.q));
+            const body = await fetchWithDeadline(endpoint(), {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'generate', exam: exam.id, subject: subject.id,
+                topic: topic, difficulty: difficulty, count: chunks[c],
+                avoid: history, batchIndex: n * chunks.length + c
+              })
+            }, 55000);
+            questions.push(...validateGenerated(
+              body, chunks[c], allPrevious.concat(history)
+            ));
+          }
           const title = 'AI · ' + (topic || subject.name) + ' · ' + difficulty + ' · ' +
             new Date().toLocaleDateString() + ' #' + (loadSaved().length + 1);
           const id = 'ai-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
