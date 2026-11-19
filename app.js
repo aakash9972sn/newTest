@@ -33,6 +33,17 @@
     TESTS.push({ test: test, exam: exam, subject: subject });
   })));
 
+  /* Register locally saved AI sets in the existing test engine. */
+  const generator = window.TestCentreAIGenerator;
+  function registerGenerated(item) {
+    if (!item || !item.test || TESTS.some((x) => x.test.id === item.id)) return;
+    const exam = EXAMS.find((e) => e.id === item.examId);
+    const subject = exam && exam.subjects.find((s) => s.id === item.subjectId);
+    if (!exam || !subject) return;
+    TESTS.push({ test: item.test, exam: exam, subject: subject });
+  }
+  if (generator) generator.loadSaved().forEach(registerGenerated);
+
   const findEntry = (id) => TESTS.find((x) => x.test.id === id);
   const questionsOf = (test) => {
     if (test.questions) return test.questions;
@@ -92,6 +103,11 @@
     renderResume();
     renderCards();
     renderHomeStats();
+    if (generator) generator.mount(EXAMS, registerGenerated, () => {
+      renderResume();
+      renderCards();
+      renderHomeStats();
+    });
   }
 
   function renderHomeStats() {
@@ -186,6 +202,20 @@
       $$('a, button', card).forEach((el) => el.addEventListener('click', (ev) => {
         if (el.tagName === 'A') return; // let the anchor navigate
         ev.preventDefault();
+        if (el.hasAttribute('data-delete-ai')) {
+          ev.stopPropagation();
+          if (!window.confirm('Delete this AI-generated test and its saved result?')) return;
+          if (!generator || !generator.removeSaved(id)) { window.alert('Could not delete this test.'); return; }
+          const index = TESTS.findIndex((entry) => entry.test.id === id);
+          if (index >= 0) TESTS.splice(index, 1);
+          store.del(PKEY(id));
+          store.del(BKEY(id));
+          store.del(RKEY(id));
+          renderCards();
+          renderResume();
+          renderHomeStats();
+          return;
+        }
         go('#/t/' + id);
       }));
     });
@@ -215,7 +245,7 @@
       '</dl>' +
       '<div class="card-foot">' + status +
       '<a class="card-cta" href="#/t/' + esc(test.id) + '">' + cta + '<span aria-hidden="true">→</span></a>' +
-      '</div></article>';
+      '</div>' + (test.generated ? '<button type="button" class="ai-test-delete" data-delete-ai>Delete saved AI test</button>' : '') + '</article>';
   }
 
   /* ------------------------------------------------------------ test runner */
