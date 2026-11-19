@@ -79,6 +79,7 @@
   }
 
   function setScreen(name) {
+    closePalette(false);
     ['home', 'test', 'result'].forEach((s) => {
       const el = $('#screen-' + s);
       if (el) el.hidden = (s !== name);
@@ -300,7 +301,7 @@
   function buildRunnerChrome() {
     $('#runner-title').textContent = run.test.title;
     $('#runner-sub').textContent = run.entry.exam.name + ' · ' + run.entry.subject.name;
-    $('#runner-count').textContent = run.questions.length + ' questions';
+    $('#runner-count').textContent = String(run.questions.length);
     $('#runner-marking').textContent = 'Marking ' + markLabel(run.test);
     renderPalette();
     updateProgressBar();
@@ -424,12 +425,36 @@
   function prevQuestion() { if (run.current > 0) goToQuestion(run.current - 1); }
 
   function paletteIsMobile() { return window.matchMedia('(max-width: 900px)').matches; }
-  function openPalette() { $('#palette').classList.add('is-open'); $('#palette-scrim').hidden = false; }
-  function closePalette() { $('#palette').classList.remove('is-open'); $('#palette-scrim').hidden = true; }
+  function openPalette() {
+    if (!paletteIsMobile()) return;
+    const palette = $('#palette');
+    palette.inert = false;
+    palette.classList.add('is-open');
+    palette.setAttribute('role', 'dialog');
+    palette.setAttribute('aria-modal', 'true');
+    $('#palette-open').setAttribute('aria-expanded', 'true');
+    $('#palette-scrim').hidden = false;
+    document.body.classList.add('palette-open');
+    $('#palette-close').focus({ preventScroll: true });
+  }
+  function closePalette(restoreFocus = true) {
+    const palette = $('#palette');
+    const wasOpen = palette.classList.contains('is-open');
+    palette.classList.remove('is-open');
+    palette.removeAttribute('role');
+    palette.removeAttribute('aria-modal');
+    palette.inert = paletteIsMobile();
+    $('#palette-open').setAttribute('aria-expanded', 'false');
+    $('#palette-scrim').hidden = true;
+    document.body.classList.remove('palette-open');
+    if (wasOpen && restoreFocus !== false && !$('#screen-test').hidden && paletteIsMobile()) $('#palette-open').focus({ preventScroll: true });
+  }
   function closePaletteOnMobile() { if (paletteIsMobile()) closePalette(); }
 
   /* ------------------------------------------------------------- submit flow */
   function askSubmit() {
+    if (!run) return;
+    closePalette(false);
     const answered = run.responses.filter((r) => r !== null && r !== undefined).length;
     const marked = run.marked.filter(Boolean).length;
     const total = run.questions.length;
@@ -633,7 +658,17 @@
     $('#palette-scrim').addEventListener('click', closePalette);
 
     document.addEventListener('keydown', (e) => {
-      if ($('#screen-test').hidden) return;
+      if ($('#screen-test').hidden || !$('#modal').hidden) return;
+      if (paletteIsMobile() && $('#palette').classList.contains('is-open')) {
+        if (e.key === 'Escape') { e.preventDefault(); closePalette(); }
+        if (e.key === 'Tab') {
+          const controls = [...$('#palette').querySelectorAll('button:not(:disabled)')];
+          const first = controls[0], last = controls[controls.length - 1];
+          if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+          else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+        }
+        return;
+      }
       if (e.target.matches('input, textarea')) return;
       const key = e.key;
       if (/^[1-9]$/.test(key)) { const n = Number(key) - 1; if (run && n < run.questions[run.current].o.length) selectOption(n); }
@@ -643,6 +678,8 @@
       else if (key === 'c' || key === 'C') clearResponse();
     });
 
+    window.matchMedia('(max-width: 900px)').addEventListener('change', () => closePalette(false));
+    closePalette(false);
     window.addEventListener('hashchange', route);
     window.addEventListener('beforeunload', () => { if (run) saveProgress(); });
   }

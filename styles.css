@@ -76,6 +76,8 @@ p { margin: 0; }
 
 /* ------------------------------------------------------------------ screens */
 .screen { animation: rise .45s cubic-bezier(.22, 1, .36, 1) both; }
+/* Fixed palette controls must stay attached to the viewport, not an animated ancestor. */
+#screen-test { animation: none; }
 @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 
 /* --------------------------------------------------------------------- hero */
@@ -190,15 +192,15 @@ p { margin: 0; }
 #btn-next { background: linear-gradient(135deg, var(--accent), var(--accent-2)); border-color: transparent; }
 
 /* palette */
-.palette { position: sticky; top: 84px; padding: 20px; border: 1px solid var(--line-soft); border-radius: var(--radius); background: rgba(15, 23, 42, .72); backdrop-filter: blur(12px); }
-.palette-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; font-weight: 600; font-size: .92rem; }
+.palette { position: sticky; top: 84px; display: flex; flex-direction: column; max-height: calc(100dvh - 108px); padding: 20px; border: 1px solid var(--line-soft); border-radius: var(--radius); background: rgba(15, 23, 42, .72); backdrop-filter: blur(12px); }
+.palette-head { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; font-weight: 600; font-size: .92rem; }
 #palette-close { display: none; background: none; border: none; color: var(--muted); font-size: 1.3rem; cursor: pointer; line-height: 1; }
-.palette-legend { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-bottom: 16px; font-size: .72rem; color: var(--muted); }
+.palette-legend { flex-shrink: 0; display: flex; flex-wrap: wrap; gap: 8px 14px; margin-bottom: 16px; font-size: .72rem; color: var(--muted); }
 .palette-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .palette-legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
 .lg-answered { background: var(--good); } .lg-marked { background: var(--mark); } .lg-unseen { background: var(--line); }
-.palette-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(38px, 1fr)); gap: 8px; max-height: 320px; overflow-y: auto; padding-right: 4px; }
-.pcell { aspect-ratio: 1; border-radius: 9px; border: 1px solid var(--line); background: var(--line-soft); color: var(--muted); font-weight: 600; font-size: .82rem; cursor: pointer; transition: .15s; }
+.palette-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(38px, 1fr)); align-content: start; flex: 0 1 auto; min-height: 0; gap: 8px; max-height: 320px; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; padding: 4px 6px 4px 4px; }
+.pcell { aspect-ratio: 1; min-height: 38px; border-radius: 9px; border: 1px solid var(--line); background: var(--line-soft); color: var(--muted); font-weight: 600; font-size: .82rem; cursor: pointer; transition: .15s; }
 .pcell:hover { transform: scale(1.08); }
 .pcell.is-answered { background: var(--good); border-color: transparent; color: #04210f; }
 .pcell.is-marked { background: var(--mark); border-color: transparent; color: #fff; }
@@ -206,11 +208,12 @@ p { margin: 0; }
 .pcell.is-answered-marked::after { content: ''; position: absolute; right: 4px; bottom: 4px; width: 6px; height: 6px; border-radius: 50%; background: var(--good); }
 .pcell.is-seen { background: rgba(244, 63, 94, .2); border-color: rgba(244, 63, 94, .4); color: #ffd7de; }
 .pcell.is-current { outline: 3px solid var(--accent); outline-offset: 2px; }
-.palette-summary { display: flex; justify-content: space-between; margin: 16px 0; font-size: .78rem; color: var(--muted); }
+.palette-footer { flex-shrink: 0; border-top: 1px solid var(--line-soft); margin-top: 14px; padding-top: 14px; background: var(--bg-2); }
+.palette-summary { display: flex; justify-content: space-between; margin: 0 0 12px; font-size: .78rem; color: var(--muted); }
 .palette-summary b { color: var(--text); }
-#btn-submit { width: 100%; padding: 13px; border-radius: 12px; border: none; background: linear-gradient(135deg, var(--good), #15a34a); color: #04120a; font-weight: 700; cursor: pointer; transition: .2s; }
+#btn-submit { width: 100%; min-height: 48px; padding: 13px; border-radius: 12px; border: none; background: linear-gradient(135deg, var(--good), #15a34a); color: #04120a; font-weight: 700; cursor: pointer; transition: .2s; }
 #btn-submit:hover { transform: translateY(-2px); box-shadow: 0 12px 26px -10px var(--good); }
-.palette-fab { display: none; position: fixed; right: 18px; bottom: 18px; z-index: 45; padding: 14px 20px; border-radius: 999px; border: none; background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; font-weight: 600; cursor: pointer; box-shadow: var(--shadow); }
+.palette-fab { display: none; position: fixed; right: 18px; bottom: max(18px, env(safe-area-inset-bottom)); z-index: 45; padding: 14px 20px; border-radius: 999px; border: none; background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; font-weight: 600; cursor: pointer; box-shadow: var(--shadow); }
 #palette-scrim { position: fixed; inset: 0; background: rgba(3, 7, 18, .6); z-index: 44; }
 
 /* ------------------------------------------------------------------- result */
@@ -287,12 +290,14 @@ p { margin: 0; }
   .runner-body { grid-template-columns: 1fr; }
   .palette {
     position: fixed; left: 0; right: 0; bottom: 0; top: auto; z-index: 46; border-radius: 20px 20px 0 0;
-    transform: translateY(110%); transition: transform .32s cubic-bezier(.22, 1, .36, 1); max-height: 76vh; overflow-y: auto;
+    transform: translateY(110%); transition: transform .32s cubic-bezier(.22, 1, .36, 1); height: min(76dvh, 700px); max-height: calc(100dvh - 16px); overflow: hidden; padding-bottom: max(20px, env(safe-area-inset-bottom));
   }
   .palette.is-open { transform: none; }
   #palette-close { display: block; }
   .palette-fab { display: block; }
-  .palette-grid { max-height: none; }
+  .palette-grid { flex: 1 1 auto; max-height: none; }
+  body.palette-open { overflow: hidden; }
+  body.palette-open .palette-fab { visibility: hidden; }
   .search { margin-left: 0; width: 100%; }
   .search input { width: 100%; max-width: none; }
 }
