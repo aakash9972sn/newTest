@@ -127,8 +127,8 @@
     }
     if (!health || health.ok !== true ||
       !Array.isArray(health.features) || !health.features.includes('generate') ||
-      health.version !== '2026-11-19-fast-v2') {
-      throw new Error('Cloudflare Worker needs the latest GitHub deployment. Check Workers & Pages → Deployments.');
+      health.generationVersion !== 3) {
+      throw new Error('Cloudflare has not deployed the updated question generator yet. Open Cloudflare → Workers & Pages → aakash-test-ai → Deployments and deploy the latest main branch.');
     }
     if (!health.aiBinding) {
       throw new Error('Cloudflare Worker is missing the Workers AI binding (name: AI).');
@@ -198,11 +198,11 @@
         await checkBackend();
         for (let n = 0; n < batch; n++) {
           const questions = [];
-          const chunks = count === 10 ? [5, 5] : [5];
+          const chunks = count === 10 ? [3, 3, 2, 2] : [2, 3];
           for (let c = 0; c < chunks.length; c++) {
             status.textContent = 'Generating test ' + (n + 1) + ' of ' + batch +
               ', question batch ' + (c + 1) + ' of ' + chunks.length +
-              '… Each batch has a timeout so it cannot hang forever.';
+              '… ' + questions.length + '/' + count + ' questions prepared.';
             const allPrevious = loadSaved().filter((x) =>
               x.examId === exam.id && x.subjectId === subject.id
             ).flatMap((x) => x.test.questions.map((q) => q.q));
