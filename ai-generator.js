@@ -162,7 +162,12 @@
           });
           const body = await response.json().catch(() => null);
           if (!response.ok) throw new Error((body && body.error) || 'AI service unavailable (' + response.status + ').');
-          const questions = validateGenerated(body, count, history);
+          // Reject repeats against *all* locally saved questions, not only the
+          // short history sent to the model to keep free usage economical.
+          const allPrevious = loadSaved().filter((x) =>
+            x.examId === exam.id && x.subjectId === subject.id
+          ).flatMap((x) => x.test.questions.map((q) => q.q));
+          const questions = validateGenerated(body, count, allPrevious.concat(history));
           const title = 'AI · ' + (topic || subject.name) + ' · ' + difficulty + ' · ' +
             new Date().toLocaleDateString() + ' #' + (loadSaved().length + 1);
           const id = 'ai-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
