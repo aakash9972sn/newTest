@@ -14,14 +14,23 @@ async function responseJSON(res) {
   return data;
 }
 
-console.log('Checking deployed Cloudflare Worker health…');
-const healthRes = await fetch(worker.replace(/\/$/, '') + '/health', {
-  signal: AbortSignal.timeout(15000)
-});
-const health = await responseJSON(healthRes);
+console.log('Checking Cloudflare deployment of Qwen generator…');
+let healthRes, health;
+for (let attempt = 1; attempt <= 12; attempt++) {
+  healthRes = await fetch(worker.replace(/\/$/, '') + '/health', {
+    signal: AbortSignal.timeout(12000)
+  });
+  health = await responseJSON(healthRes);
+  if (health.generationVersion === 4 &&
+      health.generationModel === '@cf/qwen/qwen3.8-27b') break;
+  console.log('Cloudflare still serves version ' + String(health.generationVersion) +
+    '. Checking deployment again (' + attempt + '/12).');
+  if (attempt < 12) await new Promise((resolve) => setTimeout(resolve, 7000));
+}
 console.log('Health status:', healthRes.status,
   'AI binding:', !!health.aiBinding,
-  'generation version:', health.generationVersion ?? 'missing');
+  'generation version:', health.generationVersion ?? 'missing',
+  'generation model:', health.generationModel ?? 'missing');
 assert.equal(healthRes.status, 200, 'Cloudflare health endpoint is unavailable');
 assert.equal(health.ok, true);
 assert.equal(health.aiBinding, true, 'Workers AI binding is missing');
