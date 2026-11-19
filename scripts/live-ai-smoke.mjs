@@ -28,35 +28,62 @@ assert.equal(health.aiBinding, true, 'Workers AI binding is missing');
 assert.equal(health.generationVersion, 3,
   'Old Worker is deployed; deploy latest main-branch worker/src/index.js to Cloudflare.');
 
-console.log('Sending one live 2-question AI generation request…');
-const request = {
-  action: 'generate',
-  exam: 'gate',
-  subject: 'gate-nt',
-  difficulty: 'Easy',
-  count: 2,
-  topic: 'Ohms law and resistors',
-  avoid: []
-};
-const res = await fetch(worker, {
-  method: 'POST',
-  headers: { Origin: origin, 'Content-Type': 'application/json' },
-  body: JSON.stringify(request),
-  signal: AbortSignal.timeout(90000)
+
+console.log('Checking browser-style CORS preflight…');
+const preflight = await fetch(worker, {
+  method: 'OPTIONS',
+  headers: {
+    Origin: origin,
+    'Access-Control-Request-Method': 'POST',
+    'Access-Control-Request-Headers': 'content-type'
+  },
+  signal: AbortSignal.timeout(15000)
 });
-const output = await responseJSON(res);
-if (!res.ok) {
-  throw new Error('Live AI generated HTTP ' + res.status +
-    ': ' + String(output.error || 'No error detail').slice(0, 200));
+assert.equal(preflight.status, 204, 'CORS preflight failed');
+assert.equal(preflight.headers.get('Access-Control-Allow-Origin'), origin,
+  'Browser origin is not allowed');
+
+console.log('Generating a realistic 5-question test in 2+3-question batches…');
+const questions = [];
+const prompts = ['Ohms law and resistors', 'Ohms law and resistors'];
+for (const [part, count] of [2, 3].entries()) {
+  let output;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const payload = {
+      action: 'generate', exam: 'gate', subject: 'gate-nt',
+      difficulty: 'Easy', count, topic: prompts[part],
+      avoid: questions.map((q) => q.q)
+    };
+    const res = await fetch(worker, {
+      method: 'POST',
+      headers: { Origin: origin, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(90000)
+    });
+    output = await responseJSON(res);
+    if (res.ok) break;
+    const cause = String(output.error || 'no details').slice(0, 180);
+    if (res.status === 502 && attempt === 1) {
+      console.log('Batch ' + (part + 1) + ' returned invalid AI output; retrying once.');
+      continue;
+    }
+    throw new Error('Cloudflare generation failed HTTP ' + res.status + ': ' + cause);
+  }
+  assert.ok(Array.isArray(output.questions), 'AI response omitted questions');
+  assert.equal(output.questions.length, count, 'AI returned wrong question count');
+  for (const q of output.questions) {
+    assert.ok(typeof q.q === 'string' && q.q.length >= 15, 'Invalid question');
+    assert.ok(Array.isArray(q.o) && q.o.length === 4, 'Expected four options');
+    assert.equal(new Set(q.o.map((s) => String(s).toLowerCase().trim())).size, 4,
+      'Duplicate answer options');
+    assert.ok(Number.isInteger(q.a) && q.a >= 0 && q.a <= 3, 'Invalid answer index');
+    assert.ok(typeof q.e === 'string' && q.e.length >= 10, 'Missing solution');
+    assert.ok(!questions.some((old) =>
+      old.q.toLowerCase().trim() === q.q.toLowerCase().trim()), 'Repeated question');
+  }
+  questions.push(...output.questions);
+  console.log('Batch ' + (part + 1) + ' passed (' + questions.length + '/5 questions).');
 }
-assert.ok(Array.isArray(output.questions), 'AI response omitted questions array');
-assert.equal(output.questions.length, 2, 'AI response did not contain 2 questions');
-for (const [i, q] of output.questions.entries()) {
-  assert.equal(typeof q.q, 'string', 'Missing question statement ' + i);
-  assert.ok(q.q.length >= 15, 'Question statement too short');
-  assert.ok(Array.isArray(q.o) && q.o.length === 4, 'Expected 4 options');
-  assert.ok(Number.isInteger(q.a) && q.a >= 0 && q.a < 4, 'Invalid answer index');
-  assert.ok(typeof q.e === 'string' && q.e.length >= 10, 'Missing explanation');
-}
-console.log('PASS: real Cloudflare inference returned 2 well-formed MCQs.');
-console.log('Note: Structural checks do not prove the answer key is academically correct.');
+assert.equal(questions.length, 5);
+console.log('PASS: live Cloudflare returned five usable, nonidentical question records.');
+console.log('Caution: structural checks cannot independently verify all academic answer keys.');
