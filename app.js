@@ -511,6 +511,7 @@
     $('#res-retake').addEventListener('click', () => { store.del(RKEY(result.testId)); go('#/t/' + result.testId); });
     $('#res-review').addEventListener('click', () => { $('#solutions').hidden = false; $('#solutions').scrollIntoView({ behavior: 'smooth' }); });
     renderSolutions(entry, result, questions);
+    if (window.TestCentreAI) window.TestCentreAI.mount(result, questions);
   }
 
   function scoreRow(label, value, tone) {
@@ -561,12 +562,13 @@
         return '<div class="' + cls + '"><span class="opt-key">' + letters[oi] + '</span><span class="opt-text">' + esc(opt) + '</span></div>';
       }).join('');
       list.insertAdjacentHTML('beforeend',
-        '<details class="solution is-' + state + '"' + (solutionFilter !== 'all' ? ' open' : '') + '>' +
+        '<details data-ai-qindex="' + i + '" class="solution is-' + state + '"' + (solutionFilter !== 'all' ? ' open' : '') + '>' +
         '<summary><span class="sol-num">' + (i + 1) + '</span><span class="sol-q">' + esc(q.q) + '</span><span class="sol-badge">' + badge + '</span></summary>' +
         '<div class="sol-body"><div class="sol-opts">' + opts + '</div>' +
         '<div class="sol-explain"><b>Explanation.</b> ' + esc(q.e || '—') + '</div></div></details>');
     });
     if (!list.children.length) list.innerHTML = '<p class="muted">Nothing to show for this filter.</p>';
+    if (window.TestCentreAI) window.TestCentreAI.mountSolutions(result, questions);
   }
 
   /* ----------------------------------------------------------------- modal */
