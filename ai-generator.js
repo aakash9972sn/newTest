@@ -134,8 +134,8 @@
     }
     if (!health || health.ok !== true ||
       !Array.isArray(health.features) || !health.features.includes('generate') ||
-      health.generationVersion !== 3) {
-      throw new Error('Cloudflare has not deployed the updated question generator yet. Open Cloudflare → Workers & Pages → aakash-test-ai → Deployments and deploy the latest main branch.');
+      health.generationVersion !== 4) {
+      throw new Error('Cloudflare is still using the old AI model. Deploy latest GitHub main to Workers & Pages → aakash-test-ai → Deployments.');
     }
     if (!health.aiBinding) {
       throw new Error('Cloudflare Worker is missing the Workers AI binding (name: AI).');
