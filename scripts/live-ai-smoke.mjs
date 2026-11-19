@@ -25,10 +25,11 @@ console.log('Health status:', healthRes.status,
 assert.equal(healthRes.status, 200, 'Cloudflare health endpoint is unavailable');
 assert.equal(health.ok, true);
 assert.equal(health.aiBinding, true, 'Workers AI binding is missing');
-assert.equal(health.generationVersion, 3,
+assert.equal(health.generationVersion, 4,
   'Old Worker is deployed; deploy latest main-branch worker/src/index.js to Cloudflare.');
 
 
+assert.equal(health.generationModel, '@cf/qwen/qwen3.8-27b', 'Unexpected test generation model');
 console.log('Checking browser-style CORS preflight…');
 const preflight = await fetch(worker, {
   method: 'OPTIONS',
