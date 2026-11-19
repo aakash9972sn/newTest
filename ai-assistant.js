@@ -8,7 +8,7 @@
   const arrow = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 19 19 5M5 5h14v14"/></svg>';
   const host = document.createElement("aakash-assistant");
   const root = host.attachShadow({ mode: "open" });
-  root.innerHTML = `<link rel="stylesheet" href="${new URL("ai-assistant.css?v=20261119-2", assetBase)}"><button class="launcher" aria-haspopup="dialog" aria-label="Open AI assistant"><span aria-hidden="true">${spark}</span> Ask AI</button><dialog aria-labelledby="assistant-title"><header><div class="mark" aria-hidden="true">${spark}</div><div><span class="eyebrow">A LITTLE HELP, WHEN YOU NEED IT</span><h2 id="assistant-title"></h2></div><button class="close" aria-label="Close AI assistant">×</button></header><div class="conversation"><div class="welcome"><span class="spark" aria-hidden="true">${spark}</span><h3>What’s on your mind?</h3><p></p><div class="suggestions"></div></div><div class="messages" role="log" aria-label="Conversation" aria-live="polite"></div></div><div class="status" role="status"></div><form><label class="sr-only" for="ai-question">Your question</label><textarea id="ai-question" rows="2" maxlength="700" placeholder="Ask in English or Hindi…" required></textarea><button class="send" aria-label="Send question">${arrow}</button></form><footer><span>AI can make mistakes. Check the source details.</span><button type="button" class="clear">Clear chat</button></footer><p class="privacy"></p></dialog>`;
+  root.innerHTML = `<link rel="stylesheet" href="${new URL("ai-assistant.css?v=20261119-google1", assetBase)}"><button class="launcher" aria-haspopup="dialog" aria-label="Open AI assistant"><span aria-hidden="true">${spark}</span> Ask AI</button><dialog aria-labelledby="assistant-title"><header><div class="mark" aria-hidden="true">${spark}</div><div><span class="eyebrow">A LITTLE HELP, WHEN YOU NEED IT</span><h2 id="assistant-title"></h2></div><button class="close" aria-label="Close AI assistant">×</button></header><div class="conversation"><div class="welcome"><span class="spark" aria-hidden="true">${spark}</span><h3>What’s on your mind?</h3><p></p><div class="suggestions"></div></div><div class="messages" role="log" aria-label="Conversation" aria-live="polite"></div></div><div class="status" role="status"></div><form><label class="sr-only" for="ai-question">Your question</label><textarea id="ai-question" rows="2" maxlength="700" placeholder="Ask in English or Hindi…" required></textarea><button class="send" aria-label="Send question">${arrow}</button></form><footer><span>AI can make mistakes. Check the source details.</span><button type="button" class="clear">Clear chat</button></footer><p class="privacy"></p></dialog>`;
   document.body.appendChild(host);
   const $ = (s) => root.querySelector(s),
     dialog = $("dialog"),
@@ -25,25 +25,113 @@
     controller,
     sequence = 0,
     lastQuestion = "";
-  // Explicit Google search shortcut: searches the user's query in a new tab.
-  // The assistant itself does not receive or scrape Google search results.
+  // Search uses Gemini's Google Search grounding via the same Cloudflare Worker.
+  // Results and cited source links render INSIDE the existing chat dialog.
   const google = document.createElement("button");
   google.type = "button";
   google.className = "google-search";
-  google.textContent = "Search Google ↗";
-  google.title = "Opens Google results in a new tab. The AI cannot read those results automatically.";
+  google.textContent = "Search Google in chat";
+  google.title = "Use Google-grounded AI to answer here, with sources (requires configured Google API key).";
   $("footer").insertBefore(google, $(".clear"));
-  google.addEventListener("click", () => {
-    const previous = [...history].reverse().find((message) => message.role === "user");
-    const query = input.value.trim() || (previous && previous.content) || lastQuestion;
-    if (!query) {
-      status.textContent = "Type a question to search Google.";
+  google.addEventListener("click", searchGoogle);
+
+  function renderSearchSources(message, data) {
+    if (data.googleGrounded !== true) {
+      const warning = document.createElement("small");
+      warning.className = "google-grounding-note";
+      warning.textContent = "Google did not confirm a web search for this reply. Treat it as an unverified AI answer.";
+      message.appendChild(warning);
+    }
+    const items = Array.isArray(data.sources) ? data.sources : [];
+    if (items.length) {
+      const group = document.createElement("div");
+      group.className = "google-citations";
+      const label = document.createElement("strong");
+      label.textContent = "Google-grounded sources";
+      group.appendChild(label);
+      for (const item of items.slice(0, 6)) {
+        let url;
+        try { url = new URL(item.url); } catch (_) { continue; }
+        if (url.protocol !== "https:") continue;
+        const a = document.createElement("a");
+        a.href = url.href;
+        a.textContent = String(item.title || url.hostname).slice(0, 130);
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        group.appendChild(a);
+      }
+      message.appendChild(group);
+    }
+    // Render Google's supplied search-suggestion markup unmodified in a
+    // sandboxed frame. The frame cannot execute scripts in the host page.
+    if (typeof data.suggestionHtml === "string" && data.suggestionHtml) {
+      const frame = document.createElement("iframe");
+      frame.className = "google-suggestions";
+      frame.title = "Google Search suggestions";
+      frame.setAttribute("sandbox", "allow-popups allow-popups-to-escape-sandbox");
+      frame.setAttribute("referrerpolicy", "no-referrer");
+      frame.srcdoc = data.suggestionHtml.slice(0, 15000);
+      message.appendChild(frame);
+    }
+  }
+
+  async function searchGoogle() {
+    const previous = [...history].reverse().find((m) => m.role === "user");
+    const question = input.value.trim() || (previous && previous.content) || lastQuestion;
+    if (busy || !permitted()) return;
+    if (!question || question.length < 2) {
+      status.textContent = "Type a question to search Google inside the chat.";
       input.focus();
       return;
     }
-    window.open("https://www.google.com/search?q=" + encodeURIComponent(query.slice(0, 500)),
-      "_blank", "noopener,noreferrer");
-  });
+    busy = true;
+    const id = ++sequence;
+    controller = new AbortController();
+    $(".send").disabled = true;
+    google.disabled = true;
+    status.textContent = "Searching Google and preparing an answer…";
+    $(".welcome").hidden = true;
+    if (question !== lastQuestion) bubble(question, "user");
+    lastQuestion = question;
+    input.value = "";
+    try {
+      const response = await fetch(config.endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "google_search", question: question.slice(0, 700) }),
+        signal: AbortSignal.any([controller.signal, AbortSignal.timeout(40000)])
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(
+        (data && data.error) || ("Google grounding returned HTTP " + response.status)
+      );
+      if (!data || typeof data.answer !== "string" || !data.answer.trim())
+        throw new Error("Google grounding returned no answer.");
+      if (id !== sequence) return;
+      const answer = data.answer.slice(0, 8000);
+      const message = bubble(answer, "assistant");
+      renderSearchSources(message, data);
+      history.push({ role: "user", content: question },
+                   { role: "assistant", content: answer });
+      history = history.slice(-6);
+      lastQuestion = "";
+      status.textContent = "";
+    } catch (error) {
+      if (id !== sequence) return;
+      status.textContent = error?.name === "TimeoutError"
+        ? "Google Search did not respond in time. Try again."
+        : error?.message || "Google Search is unavailable.";
+      input.value = question;
+    } finally {
+      if (id === sequence) {
+        busy = false;
+        $(".send").disabled = false;
+        google.disabled = false;
+        input.focus();
+      }
+    }
+  }
+
   for (const question of config.suggestions || []) {
     const button = document.createElement("button");
     button.type = "button";
@@ -69,6 +157,7 @@
     controller = null;
     busy = false;
     $(".send").disabled = false;
+    google.disabled = false;
     $(".send").innerHTML = arrow;
     status.textContent = "";
   }
