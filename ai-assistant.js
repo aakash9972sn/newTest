@@ -150,6 +150,18 @@
     if (!dialog.open) dialog.showModal();
     if (question) input.value = question;
     input.focus();
+    // Explain the one-time setup visibly instead of pretending search is ready.
+    fetch(config.endpoint.replace(/\/$/, "") + "/health", {
+      signal: AbortSignal.timeout(7000)
+    }).then((res) => res.json()).then((health) => {
+      if (health.googleSearchConfigured === true) {
+        google.textContent = "Search Google in chat";
+        google.title = "Ask Google-grounded AI here, with citations.";
+      } else if (health.googleSearchConfigured === false) {
+        google.textContent = "Google Search · setup required";
+        google.title = "Configure GEMINI_API_KEY as a Cloudflare Worker secret first.";
+      }
+    }).catch(() => { /* keep search button; actual call reports any issue */ });
   }
   function cancel() {
     sequence++;
