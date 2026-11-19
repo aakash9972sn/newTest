@@ -8,7 +8,7 @@
   const arrow = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 19 19 5M5 5h14v14"/></svg>';
   const host = document.createElement("aakash-assistant");
   const root = host.attachShadow({ mode: "open" });
-  root.innerHTML = `<link rel="stylesheet" href="${new URL("ai-assistant.css?v=20261119-1", assetBase)}"><button class="launcher" aria-haspopup="dialog" aria-label="Open AI assistant"><span aria-hidden="true">${spark}</span> Ask AI</button><dialog aria-labelledby="assistant-title"><header><div class="mark" aria-hidden="true">${spark}</div><div><span class="eyebrow">A LITTLE HELP, WHEN YOU NEED IT</span><h2 id="assistant-title"></h2></div><button class="close" aria-label="Close AI assistant">×</button></header><div class="conversation"><div class="welcome"><span class="spark" aria-hidden="true">${spark}</span><h3>What’s on your mind?</h3><p></p><div class="suggestions"></div></div><div class="messages" role="log" aria-label="Conversation" aria-live="polite"></div></div><div class="status" role="status"></div><form><label class="sr-only" for="ai-question">Your question</label><textarea id="ai-question" rows="2" maxlength="700" placeholder="Ask in English or Hindi…" required></textarea><button class="send" aria-label="Send question">${arrow}</button></form><footer><span>AI can make mistakes. Check the source details.</span><button type="button" class="clear">Clear chat</button></footer><p class="privacy"></p></dialog>`;
+  root.innerHTML = `<link rel="stylesheet" href="${new URL("ai-assistant.css?v=20261119-2", assetBase)}"><button class="launcher" aria-haspopup="dialog" aria-label="Open AI assistant"><span aria-hidden="true">${spark}</span> Ask AI</button><dialog aria-labelledby="assistant-title"><header><div class="mark" aria-hidden="true">${spark}</div><div><span class="eyebrow">A LITTLE HELP, WHEN YOU NEED IT</span><h2 id="assistant-title"></h2></div><button class="close" aria-label="Close AI assistant">×</button></header><div class="conversation"><div class="welcome"><span class="spark" aria-hidden="true">${spark}</span><h3>What’s on your mind?</h3><p></p><div class="suggestions"></div></div><div class="messages" role="log" aria-label="Conversation" aria-live="polite"></div></div><div class="status" role="status"></div><form><label class="sr-only" for="ai-question">Your question</label><textarea id="ai-question" rows="2" maxlength="700" placeholder="Ask in English or Hindi…" required></textarea><button class="send" aria-label="Send question">${arrow}</button></form><footer><span>AI can make mistakes. Check the source details.</span><button type="button" class="clear">Clear chat</button></footer><p class="privacy"></p></dialog>`;
   document.body.appendChild(host);
   const $ = (s) => root.querySelector(s),
     dialog = $("dialog"),
@@ -25,6 +25,25 @@
     controller,
     sequence = 0,
     lastQuestion = "";
+  // Explicit Google search shortcut: searches the user's query in a new tab.
+  // The assistant itself does not receive or scrape Google search results.
+  const google = document.createElement("button");
+  google.type = "button";
+  google.className = "google-search";
+  google.textContent = "Search Google ↗";
+  google.title = "Opens Google results in a new tab. The AI cannot read those results automatically.";
+  $("footer").insertBefore(google, $(".clear"));
+  google.addEventListener("click", () => {
+    const previous = [...history].reverse().find((message) => message.role === "user");
+    const query = input.value.trim() || (previous && previous.content) || lastQuestion;
+    if (!query) {
+      status.textContent = "Type a question to search Google.";
+      input.focus();
+      return;
+    }
+    window.open("https://www.google.com/search?q=" + encodeURIComponent(query.slice(0, 500)),
+      "_blank", "noopener,noreferrer");
+  });
   for (const question of config.suggestions || []) {
     const button = document.createElement("button");
     button.type = "button";
