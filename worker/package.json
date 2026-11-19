@@ -1,0 +1,1 @@
+{"name":"aakash-ai-worker","private":true,"type":"module","scripts":{"test":"node --test ../tests/ai-worker.test.mjs"}}

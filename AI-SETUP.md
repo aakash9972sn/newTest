@@ -1,16 +1,69 @@
-# Free AI integration (Cloudflare Workers AI)
+# One Cloudflare AI Worker for three websites
 
-The existing test runner and marking are unchanged. AI appears on the **results** screen only; it can analyze wrong answers and explain a submitted question. AI-generated text is advisory, not the marking key.
+Configured endpoint: `https://aakash-test-ai.aakashinfinity72.workers.dev`.
+The Worker supports:
 
-## Activate (free plan)
-1. Create a free Cloudflare account, install Node.js, and from this repository run `cd worker && npx wrangler login`.
-2. Run `npx wrangler deploy` from the `worker` directory. The `[ai]` binding connects Cloudflare Workers AI. Accept the free subdomain when prompted.
-3. Copy the Worker HTTPS URL displayed after deployment into `ai-config.js`, e.g. `window.TEST_CENTRE_AI_ENDPOINT = "https://aakash-test-ai.YOUR-SUBDOMAIN.workers.dev";`.
-4. Commit `ai-config.js`, deploy GitHub Pages, open a test's result screen, and click **Analyze my test** or **Ask AI to explain**.
+- `assistant` with `app: shop`: Blunder catalogue, packs, budget and policy help.
+- `assistant` with `app: portfolio`: published project Q&A and architecture explanations.
+- `assistant` with `app: study`: revision planning, test selection and concept help.
+- Existing `generate`: fresh test sets with duplicate-question checks.
+- Existing `analysis` and `doubt`: completed-test analysis and solution explanations.
 
-The API runs on the Worker; no OpenAI/Gemini API key or billing is required for usage within Cloudflare's free allocations. Model availability and limits may change. If you expect public traffic, add a Cloudflare Rate Limiting binding or Turnstile server verification to prevent quota exhaustion. A browser Origin check alone is **not** abuse prevention; this is a starter, not a production-authenticated API.
+The assistant is opt-in, sends a question and public page context only, and keeps
+conversation history in memory. No API key is exposed. The Test Centre's general
+assistant is hidden during an active timed attempt; its result/solution coach
+remains available afterward. AI never changes marking, stock, order totals or
+payment state. Provider failures are shown honestly; no canned response is labelled
+as a successful model response.
 
-**Important:** The Worker is not deployed by this pull request. AI controls remain hidden until you set a live HTTPS Worker endpoint in `ai-config.js`.
+## Update the existing Worker
+
+The older deployed Worker recognizes the test-specific actions. Adding its URL
+to another page is insufficient for the new assistant routes. Publish the updated
+`worker/src/index.js` to the existing `aakash-test-ai` Worker:
+
+1. In Cloudflare Dashboard → Workers & Pages → **aakash-test-ai** → Edit code,
+   replace the module with `worker/src/index.js`, then Deploy. Keep the existing
+   `AI` Workers AI binding and `ALLOWED_ORIGIN=https://aakash9972sn.github.io`.
+2. Alternatively, from the `worker` directory: `npx wrangler login` and
+   `npx wrangler deploy`. No deployment credential belongs in frontend code.
+3. Open `/health` on the Worker URL. It should report `assistantVersion: 2`,
+   `apps: ["shop", "portfolio", "study"]` and `configured: true`.
+4. On each website, open **Ask AI** and try a suggested question. The Worker must
+   return a real model answer. Existing completed-test coach buttons still work.
+
+This workspace has no Cloudflare deployment login/token and its network blocks
+workers.dev, so the updated Worker has **not** been deployed or verified live here.
+The source and browser integrations are tested with injected provider responses.
+The existing model is retained; optionally set `AI_MODEL` to an available Workers
+AI text model. Free allocations and supported models are controlled by Cloudflare;
+AI is not promised to be unlimited or permanently free.
+
+## Traffic and data
+
+Only the configured exact browser origin is accepted. Payloads have a 32 KB bound,
+questions/history are bounded and the Worker has an in-isolate per-IP throttle.
+For public traffic, add the optional `AI_RATE_LIMITER` Cloudflare rate-limiting
+binding (or Turnstile/auth appropriate to the site). In-memory limits reset across
+isolates; Origin checks alone cannot prevent non-browser abuse. Set account usage
+limits and monitor costs. No background model calls occur just from visiting a page.
+
+Provider output is displayed with `textContent`, never executed as HTML. Shop
+context excludes phone, email, delivery addresses and private order tokens. User
+questions may still contain whatever the user types, so the UI asks them not to
+share private details. Portfolio answers must distinguish proposed systems from
+implemented work. Model suggestions remain advisory.
+
+## Tests
+
+```sh
+node --test tests/ai-worker.test.mjs
+```
+
+Covers all three assistant contexts, legacy test routes, CORS, request limits,
+invalid inputs, role filtering, provider failures and the capability endpoint.
+The shared UI files are copied consistently across the three repositories;
+change `ai-config.js` in each app for page-specific context and suggestions.
 
 ## Fresh AI-generated tests
 
