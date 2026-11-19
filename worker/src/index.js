@@ -42,10 +42,14 @@ async function generateAI(body, env, headers) {
   try {
     let result;
     try {
-      result=await env.AI.run(MODEL,{messages,temperature:0.8,max_tokens:count===10?5000:3000,
-        response_format:{type:'json_schema',json_schema:questionSchema(count)}});
+      result=await env.AI.run(MODEL,{messages,temperature:0.7,max_tokens:count===10?4000:2200,
+        response_format:{type:'json_schema',json_schema:questionSchema(count)}},{rejectIfBusy:true});
     } catch(e) {
-      result=await env.AI.run(MODEL,{messages,temperature:0.8,max_tokens:count===10?5000:3000});
+      // Only retry without JSON Schema when it was the unsupported parameter.
+      // Do not retry quota/capacity errors, which would prolong the wait.
+      const why=String(e && e.message || e);
+      if (!/json|schema|format|unsupported|invalid.*parameter|400/i.test(why)) throw e;
+      result=await env.AI.run(MODEL,{messages,temperature:0.7,max_tokens:count===10?4000:2200},{rejectIfBusy:true});
     }
     let value=result&&(result.response||result.choices?.[0]?.message?.content);
     if(typeof value==='string') {
@@ -87,7 +91,7 @@ export default {
     const origin = request.headers.get('Origin') || '';
     const headers = {'Access-Control-Allow-Origin': allowed, 'Access-Control-Allow-Methods':'POST, OPTIONS', 'Access-Control-Allow-Headers':'Content-Type', 'Vary':'Origin', 'Cache-Control':'no-store', 'Content-Type':'application/json'};
     if (request.method === 'OPTIONS') return new Response(null, {status:origin===allowed?204:403, headers});
-    if (request.method === 'GET' && new URL(request.url).pathname === '/health') return json({ok:true,service:'Test Centre AI',features:['analysis','doubt','generate'],aiBinding:!!env.AI},200,headers);
+    if (request.method === 'GET' && new URL(request.url).pathname === '/health') return json({ok:true,service:'Test Centre AI',features:['analysis','doubt','generate'],version:'2026-11-19-fast-v2',aiBinding:!!env.AI},200,headers);
     if (request.method !== 'POST' || origin !== allowed) return json({error:'Not permitted'},403,headers);
     if (!env.AI) return json({error:'Worker AI binding not configured'},503,headers);
     let raw = await request.text();
