@@ -1,127 +1,120 @@
-/* AI Study Coach — opt-in after results, powered by a separately deployed free Cloudflare Worker.
-   No credentials are kept in the browser. The coach is hidden until ai-config.js is set. */
+/* Post-test bridge to the existing Aakash Assistant.
+   Reuses the working shared AI chat: no second model call or duplicate backend.
+   The result/answer prompts are prepared after submission only. */
 (function () {
   'use strict';
 
-  function endpoint() {
-    return typeof window.TEST_CENTRE_AI_ENDPOINT === 'string'
-      ? window.TEST_CENTRE_AI_ENDPOINT.trim() : '';
-  }
+  const truncate = (value, max) => String(value == null ? '' : value).slice(0, max);
+  const esc = (value) => String(value).replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[c]);
 
-  async function requestAI(action, payload, button, output) {
-    if (!endpoint()) return;
-    button.disabled = true;
-    output.textContent = 'AI is preparing your explanation…';
-    output.hidden = false;
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 45000);
-      let response;
-      try {
-        response = await fetch(endpoint(), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: action, ...payload }),
-          signal: controller.signal
-        });
-      } finally { clearTimeout(timeout); }
-      let data;
-      try { data = await response.json(); } catch (_) { data = null; }
-      if (!response.ok) {
-        throw new Error((data && data.error) || (
-          response.status === 429 ? 'Too many requests. Try again later.' : 'AI is temporarily unavailable.'
-        ));
+  function openAssistant(prompt, output) {
+    if (window.AakashAssistant && typeof window.AakashAssistant.open === 'function') {
+      window.AakashAssistant.open(prompt.slice(0, 700));
+      if (output) {
+        output.hidden = false;
+        output.textContent = 'Question prepared in the AI Assistant. Press Send there to get a response.';
       }
-      output.textContent = String((data && data.answer) || 'No answer was returned.');
-    } catch (error) {
-      output.textContent = error && error.name === 'AbortError'
-        ? 'AI request timed out. Check Cloudflare Worker deployments and free usage.'
-        : (error && error.message ? error.message : 'Could not connect to AI.');
-    } finally {
-      button.disabled = false;
+    } else {
+      if (output) {
+        output.hidden = false;
+        output.textContent = 'AI Assistant is not loaded yet. Refresh the page and retry.';
+      }
     }
   }
 
-  function mount(result, questions) {
-    if (!endpoint()) return;
+  function analysisPrompt(result) {
+    const topics = Object.entries(result.topics || {})
+      .map(([name, t]) => ({ name, wrong: Number(t.wrong) || 0, skipped: Number(t.unattempted) || 0,
+        correct: Number(t.correct) || 0 }))
+      .sort((a, b) => (b.wrong * 2 + b.skipped) - (a.wrong * 2 + a.skipped));
+    const weak = topics.slice(0, 6).map((t) =>
+      truncate(t.name, 35) + ' (' + t.correct + ' right, ' + t.wrong +
+      ' wrong, ' + t.skipped + ' skipped)').join('; ');
+    return [
+      'Analyze my COMPLETED ' + truncate(result.exam, 24) + ' ' +
+        truncate(result.subject, 40) + ' test. Use only the numbers below.',
+      'Score: ' + result.score + '/' + result.total + '.',
+      'Accuracy: ' + result.accuracy + '%.',
+      'Correct ' + result.correct + ', wrong ' + result.wrong +
+        ', skipped ' + result.unattempted + '.',
+      'Weak topics: ' + (weak || 'not available') + '.',
+      'Give my top 3 priorities and a short, practical revision plan.',
+      'Do not invent timing data.'
+    ].join(' ').slice(0, 700);
+  }
+
+  function questionPrompt(q, selected, exam, subject) {
+    const selectedLabel = Number.isInteger(selected) && q.o[selected] ?
+      q.o[selected] : 'Skipped';
+    return [
+      'Explain this COMPLETED ' + truncate(exam, 20) + ' ' +
+        truncate(subject, 30) + ' MCQ. Double-check the given answer key.',
+      'Q: ' + truncate(q.q, 210),
+      'A: ' + truncate(q.o[0], 55),
+      'B: ' + truncate(q.o[1], 55),
+      'C: ' + truncate(q.o[2], 55),
+      'D: ' + truncate(q.o[3], 55),
+      'My answer: ' + truncate(selectedLabel, 65) + '.',
+      'Stored key: ' + truncate(q.o[q.a], 65) + '.',
+      'Explain why, and flag any mistake in the stored key.'
+    ].join(' ').slice(0, 700);
+  }
+
+  function mount(result) {
     const host = document.querySelector('#result-body');
     if (!host) return;
-    const old = host.querySelector('#ai-study-coach');
-    if (old) old.remove();
+    const previous = host.querySelector('#ai-study-coach');
+    if (previous) previous.remove();
 
     const panel = document.createElement('section');
     panel.className = 'ai-study-coach';
     panel.id = 'ai-study-coach';
     panel.innerHTML =
-      '<div class="ai-coach-title"><h3>AI Study Coach</h3><span>Free-tier powered</span></div>' +
-      '<p>Get a personalized revision plan based on this completed test. ' +
-      'AI may make mistakes; check the verified solutions.</p>' +
-      '<button type="button" class="btn btn-primary" id="ai-analyze">Analyze my test</button>' +
+      '<div class="ai-coach-title"><h3>AI Result Review</h3>' +
+      '<span>Uses your existing AI Assistant</span></div>' +
+      '<p>Review the score and weak topics in the AI Assistant already on this site. ' +
+      'Your test answers are not sent automatically; you choose when to ask. ' +
+      'AI advice can contain errors.</p>' +
+      '<button type="button" class="btn btn-primary" id="ai-analyze">Open AI analysis</button>' +
       '<div class="ai-coach-output" id="ai-analysis-output" hidden aria-live="polite"></div>';
     host.appendChild(panel);
 
     const button = panel.querySelector('#ai-analyze');
     const output = panel.querySelector('#ai-analysis-output');
-    button.addEventListener('click', function () {
-      const review = questions.map(function (q, i) {
-        const chosen = result.responses[i];
-        if (chosen === q.a) return null;
-        return {
-          topic: q.t || 'General',
-          question: String(q.q || '').slice(0, 260),
-          selected: chosen == null ? 'Skipped' : String(q.o[chosen] || 'Unknown').slice(0, 120),
-          answer: String(q.o[q.a] || '').slice(0, 120)
-        };
-      }).filter(Boolean).slice(0, 8);
-      const stats = {
-        exam: result.exam, subject: result.subject,
-        correct: result.correct, wrong: result.wrong, skipped: result.unattempted,
-        accuracy: result.accuracy, timeUsedSeconds: result.timeUsed,
-        topics: result.topics, review: review
-      };
-      requestAI('analysis', { stats: stats }, button, output);
-    });
+    button.addEventListener('click', () => openAssistant(analysisPrompt(result), output));
   }
 
   function mountSolutions(result, questions) {
-    if (!endpoint()) return;
     const cards = document.querySelectorAll('#solution-list details[data-ai-qindex]');
-    cards.forEach(function (card) {
+    cards.forEach((card) => {
       const i = Number(card.dataset.aiQindex);
       const q = questions[i];
-      if (!q || card.querySelector('.ai-doubt-control')) return;
       const body = card.querySelector('.sol-body');
-      if (!body) return;
+      if (!q || !body || !Array.isArray(q.o) || q.o.length !== 4 ||
+          card.querySelector('.ai-doubt-control')) return;
 
       const box = document.createElement('div');
       box.className = 'ai-doubt-control';
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'btn-ai-doubt';
-      button.textContent = 'Ask AI to explain';
-      const output = document.createElement('div');
-      output.className = 'ai-coach-output';
-      output.hidden = true;
-      output.setAttribute('aria-live', 'polite');
+      button.textContent = 'Explain with AI Assistant';
+      const status = document.createElement('div');
+      status.className = 'ai-coach-output';
+      status.hidden = true;
+      status.setAttribute('aria-live', 'polite');
       box.appendChild(button);
-      box.appendChild(output);
+      box.appendChild(status);
       body.appendChild(box);
 
-      button.addEventListener('click', function () {
-        const chosen = result.responses[i];
-        requestAI('doubt', {
-          question: {
-            exam: result.exam, subject: result.subject, topic: q.t || 'General',
-            text: String(q.q || '').slice(0, 650),
-            options: q.o,
-            correctIndex: q.a,
-            selectedIndex: chosen == null ? null : chosen,
-            verifiedExplanation: String(q.e || '').slice(0, 1000)
-          }
-        }, button, output);
+      button.addEventListener('click', () => {
+        const selected = result.responses[i];
+        openAssistant(questionPrompt(q, selected, result.exam, result.subject), status);
       });
     });
   }
 
-  window.TestCentreAI = { mount: mount, mountSolutions: mountSolutions };
+  window.TestCentreAI = { mount, mountSolutions };
 })();
