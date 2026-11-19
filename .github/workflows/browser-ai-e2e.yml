@@ -1,0 +1,35 @@
+name: Browser AI Test Centre E2E
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "scripts/browser-ai-e2e.mjs"
+      - ".github/workflows/browser-ai-e2e.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  browser-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install headless browser
+        run: |
+          npm install --no-save --no-package-lock playwright
+          npx playwright install chromium --with-deps
+      - name: Test live site and real AI generation in browser
+        run: node scripts/browser-ai-e2e.mjs
+      - name: Save debug screenshot on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-ai-debug
+          path: browser-ai-debug.png
+          retention-days: 1
