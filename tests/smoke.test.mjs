@@ -48,7 +48,8 @@ test('health endpoint advertises AI generation without invoking the model', asyn
   assert.equal(response.status, 200);
   const body = await response.json();
   assert.equal(body.ok, true);
-  assert.equal(body.generationVersion, 3);
+  assert.equal(body.generationVersion, 4);
+  assert.equal(body.generationModel, '@cf/qwen/qwen3.8-27b');
   assert.ok(body.features.includes('generate'));
 });
 
@@ -71,7 +72,7 @@ for (const count of [2, 3]) {
   test('generator accepts ' + count + ' correct MCQs in Gemma JSON mode', async () => {
     const response = await worker.fetch(request(payload(count)),
       envWith(async (model, options) => {
-        assert.match(model, /^@cf\//);
+        assert.equal(model, '@cf/qwen/qwen3.8-27b');
         assert.equal(options.response_format.type, 'json_object');
         assert.equal(options.chat_template_kwargs.enable_thinking, false);
         return { response: JSON.stringify({ questions: questions(count) }) };

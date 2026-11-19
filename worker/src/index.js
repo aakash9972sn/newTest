@@ -111,7 +111,7 @@ async function generateAI(body, env, headers) {
     let result;
     try {
       result = await env.AI.run(
-        env.AI_MODEL || DEFAULT_MODEL,
+        env.AI_GENERATOR_MODEL || GENERATION_MODEL,
         {
           messages,
           temperature: 0.7,
@@ -128,7 +128,7 @@ async function generateAI(body, env, headers) {
       if (!/json|schema|format|unsupported|invalid.*parameter/i.test(why))
         throw e;
       result = await env.AI.run(
-        env.AI_MODEL || DEFAULT_MODEL,
+        env.AI_GENERATOR_MODEL || GENERATION_MODEL,
         { messages, temperature: 0.65, max_tokens: count === 5 ? 3200 : 2100, chat_template_kwargs: { enable_thinking: false } },
         { rejectIfBusy: true },
       );
@@ -206,6 +206,7 @@ async function generateAI(body, env, headers) {
 }
 
 const DEFAULT_MODEL = "@cf/google/gemma-4-26b-a4b-it";
+const GENERATION_MODEL = "@cf/qwen/qwen3.8-27b";
 const buckets = new Map();
 const json = (value, status, headers) =>
   new Response(JSON.stringify(value), { status, headers });
@@ -352,7 +353,8 @@ export default {
           features: ["analysis", "doubt", "generate", "assistant"],
           aiBinding: !!env.AI,
           version: "2026-11-19-fast-v2",
-          generationVersion: 3,
+          generationVersion: 4,
+          generationModel: GENERATION_MODEL,
           assistantVersion: 2,
           apps: ["shop", "portfolio", "study"],
           configured: !!env.AI,

@@ -1,10 +1,12 @@
 name: Live Cloudflare AI smoke test
 
 on:
-  pull_request:
+  push:
+    branches: [main]
     paths:
-      - ".github/workflows/live-ai-smoke.yml"
+      - "worker/src/index.js"
       - "scripts/live-ai-smoke.mjs"
+      - ".github/workflows/live-ai-smoke.yml"
   workflow_dispatch:
 
 permissions:
@@ -13,11 +15,11 @@ permissions:
 jobs:
   live-inference:
     runs-on: ubuntu-latest
-    timeout-minutes: 4
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Test the real deployed Cloudflare AI Worker (uses a small amount of free quota)
+      - name: Test deployed Qwen model and 5-question generation (consumes free quota)
         run: node scripts/live-ai-smoke.mjs
