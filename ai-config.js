@@ -1,2 +1,2 @@
-// After deploying your Worker, paste its HTTPS endpoint below. Leave blank to hide AI features.
-window.TEST_CENTRE_AI_ENDPOINT = "";
+// Cloudflare Workers AI endpoint (free tier)
+window.TEST_CENTRE_AI_ENDPOINT = "https://aakash-test-ai.aakashinfinity72.workers.dev";
