@@ -57,7 +57,7 @@ async function generateAI(body, env, headers) {
   const count = body.count;
   if (
     !name ||
-    ![5, 10].includes(count) ||
+    ![2, 3, 5].includes(count) ||
     !["Easy", "Medium", "Hard", "Mixed"].includes(body.difficulty) ||
     (body.topic !== undefined &&
       (typeof body.topic !== "string" || body.topic.length > 80))
@@ -95,6 +95,7 @@ async function generateAI(body, env, headers) {
     "Each question has q (stem), o (exactly four distinct choices), a (integer index 0 to 3 of ONLY correct choice),",
     "e (short accurate explanation of at least 10 characters), and t (specific subtopic).",
     "Ensure accurate numerical calculations and rotate correct option positions.",
+    "Keep explanations to 1-2 sentences per question. Do not include lengthy derivations or extra text.",
     "Use ONLY self-contained questions, without external images or passages.",
     "No markdown, no additional prose; valid JSON object only.",
   ].join("\n");
@@ -114,11 +115,9 @@ async function generateAI(body, env, headers) {
         {
           messages,
           temperature: 0.7,
-          max_tokens: count === 10 ? 4000 : 2200,
-          response_format: {
-            type: "json_schema",
-            json_schema: questionSchema(count),
-          },
+          max_tokens: count === 5 ? 3200 : 2100,
+          response_format: { type: "json_object" },
+          chat_template_kwargs: { enable_thinking: false },
         },
         { rejectIfBusy: true },
       );
@@ -126,11 +125,11 @@ async function generateAI(body, env, headers) {
       // Only retry without JSON Schema when it was the unsupported parameter.
       // Do not retry quota/capacity errors, which would prolong the wait.
       const why = String((e && e.message) || e);
-      if (!/json|schema|format|unsupported|invalid.*parameter|400/i.test(why))
+      if (!/json|schema|format|unsupported|invalid.*parameter/i.test(why))
         throw e;
       result = await env.AI.run(
         env.AI_MODEL || DEFAULT_MODEL,
-        { messages, temperature: 0.7, max_tokens: count === 10 ? 4000 : 2200 },
+        { messages, temperature: 0.65, max_tokens: count === 5 ? 3200 : 2100, chat_template_kwargs: { enable_thinking: false } },
         { rejectIfBusy: true },
       );
     }
@@ -353,6 +352,7 @@ export default {
           features: ["analysis", "doubt", "generate", "assistant"],
           aiBinding: !!env.AI,
           version: "2026-11-19-fast-v2",
+          generationVersion: 3,
           assistantVersion: 2,
           apps: ["shop", "portfolio", "study"],
           configured: !!env.AI,
