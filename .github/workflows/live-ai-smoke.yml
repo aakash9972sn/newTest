@@ -7,6 +7,11 @@ on:
       - "worker/src/index.js"
       - "scripts/live-ai-smoke.mjs"
       - ".github/workflows/live-ai-smoke.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "scripts/live-ai-smoke.mjs"
+      - ".github/workflows/live-ai-smoke.yml"
   workflow_dispatch:
 
 permissions:
