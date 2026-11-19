@@ -14,11 +14,17 @@
     output.textContent = 'AI is preparing your explanation…';
     output.hidden = false;
     try {
-      const response = await fetch(endpoint(), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: action, ...payload })
-      });
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 45000);
+      let response;
+      try {
+        response = await fetch(endpoint(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: action, ...payload }),
+          signal: controller.signal
+        });
+      } finally { clearTimeout(timeout); }
       let data;
       try { data = await response.json(); } catch (_) { data = null; }
       if (!response.ok) {
@@ -28,7 +34,9 @@
       }
       output.textContent = String((data && data.answer) || 'No answer was returned.');
     } catch (error) {
-      output.textContent = error && error.message ? error.message : 'Could not connect to AI.';
+      output.textContent = error && error.name === 'AbortError'
+        ? 'AI request timed out. Check Cloudflare Worker deployments and free usage.'
+        : (error && error.message ? error.message : 'Could not connect to AI.');
     } finally {
       button.disabled = false;
     }
