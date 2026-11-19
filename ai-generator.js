@@ -126,7 +126,8 @@
       throw error;
     }
     if (!health || health.ok !== true ||
-      !Array.isArray(health.features) || !health.features.includes('generate')) {
+      !Array.isArray(health.features) || !health.features.includes('generate') ||
+      health.version !== '2026-11-19-fast-v2') {
       throw new Error('Cloudflare Worker needs the latest GitHub deployment. Check Workers & Pages → Deployments.');
     }
     if (!health.aiBinding) {
