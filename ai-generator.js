@@ -89,9 +89,13 @@
   }
 
 
-  async function fetchWithDeadline(url, options, ms) {
+  async function fetchWithDeadline(url, options, ms, externalSignal) {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), ms);
+    let timedOut = false;
+    const relayAbort = () => controller.abort();
+    if (externalSignal?.aborted) throw new Error('Generation cancelled.');
+    externalSignal?.addEventListener('abort', relayAbort, { once: true });
+    const timer = setTimeout(() => { timedOut = true; controller.abort(); }, ms);
     try {
       const response = await fetch(url, { ...options, signal: controller.signal });
       const body = await response.json().catch(() => null);
@@ -102,7 +106,9 @@
       return body;
     } catch (error) {
       if (error && error.name === 'AbortError') {
-        throw new Error('AI request timed out. Check the Worker deployment and free AI quota, or retry a 5-question test.');
+        if (externalSignal?.aborted && !timedOut) throw new Error('Generation cancelled.');
+        throw new Error('AI did not respond within ' + Math.round(ms / 1000) +
+          ' seconds. Try again or check Cloudflare Worker logs.');
       }
       if (error instanceof TypeError) {
         throw new Error('Cannot reach the Cloudflare Worker. Check its deployment, URL, and AI binding.');
@@ -110,15 +116,16 @@
       throw error;
     } finally {
       clearTimeout(timer);
+      externalSignal?.removeEventListener('abort', relayAbort);
     }
   }
 
-  async function checkBackend() {
+  async function checkBackend(signal) {
     const workerUrl = endpoint();
     const healthUrl = workerUrl.replace(/\/$/, '') + '/health';
     let health;
     try {
-      health = await fetchWithDeadline(healthUrl, { method: 'GET' }, 12000);
+      health = await fetchWithDeadline(healthUrl, { method: 'GET' }, 10000, signal);
     } catch (error) {
       if (error && /403|404|Not permitted/.test(error.message)) {
         throw new Error('Cloudflare is using the old Worker code. Check Workers & Pages → aakash-test-ai → Deployments.');
@@ -154,7 +161,12 @@
       '<label>Number of tests<select id="ai-gen-batch"><option value="1">1 test</option>' +
       '<option value="2">2 different tests</option><option value="3">3 different tests</option></select></label>' +
       '<button type="submit" class="btn btn-primary" id="ai-gen-submit">Generate AI tests</button>' +
-      '</form><p class="ai-gen-status" id="ai-gen-status" aria-live="polite"></p>';
+      '</form>' +
+      '<div class="ai-gen-job" id="ai-gen-job" hidden>' +
+      '<div class="ai-gen-job-line"><span id="ai-gen-progress-label">Preparing…</span>' +
+      '<button type="button" class="ai-gen-cancel" id="ai-gen-cancel">Cancel</button></div>' +
+      '<progress id="ai-gen-progress" value="0" max="5"></progress></div>' +
+      '<p class="ai-gen-status" id="ai-gen-status" role="status" aria-live="polite"></p>';
 
     const form = host.querySelector('#ai-gen-form');
     const examSelect = host.querySelector('#ai-gen-exam');
@@ -165,6 +177,18 @@
     const batchSelect = host.querySelector('#ai-gen-batch');
     const button = host.querySelector('#ai-gen-submit');
     const status = host.querySelector('#ai-gen-status');
+    const progressWrap = host.querySelector('#ai-gen-job');
+    const progress = host.querySelector('#ai-gen-progress');
+    const progressLabel = host.querySelector('#ai-gen-progress-label');
+    const cancel = host.querySelector('#ai-gen-cancel');
+    const controls = Array.from(form.querySelectorAll('input, select'));
+    let activeController = null;
+    cancel.addEventListener('click', () => {
+      if (!activeController) return;
+      cancel.disabled = true;
+      progressLabel.textContent = 'Cancelling…';
+      activeController.abort();
+    });
 
     exams.forEach((exam) => examSelect.add(new Option(exam.name, exam.id)));
     function syncSubjects() {
@@ -190,12 +214,21 @@
         status.textContent = 'You have reached the 30-test local storage limit. Delete an older AI test first.';
         return;
       }
+      status.dataset.state = 'progress';
       button.disabled = true;
       button.textContent = 'Generating…';
+      controls.forEach((input) => { input.disabled = true; });
+      const controller = new AbortController();
+      activeController = controller;
+      cancel.disabled = false;
+      progressWrap.hidden = false;
+      progress.max = batch * count;
+      progress.value = 0;
+      progressLabel.textContent = '0 / ' + (batch * count) + ' questions';
       let created = 0;
       try {
         status.textContent = 'Checking Cloudflare AI connection…';
-        await checkBackend();
+        await checkBackend(controller.signal);
         for (let n = 0; n < batch; n++) {
           const questions = [];
           const chunks = count === 10 ? [3, 3, 2, 2] : [2, 3];
@@ -208,7 +241,11 @@
             ).flatMap((x) => x.test.questions.map((q) => q.q));
             const history = makeHistory(exam.id, subject.id, topic)
               .concat(questions.map((q) => q.q));
-            const body = await fetchWithDeadline(endpoint(), {
+            let chunkQuestions;
+            for (let attempt = 1; attempt <= 2; attempt++) {
+              if (controller.signal.aborted) throw new Error('Generation cancelled.');
+              try {
+                const body = await fetchWithDeadline(endpoint(), {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -216,10 +253,18 @@
                 topic: topic, difficulty: difficulty, count: chunks[c],
                 avoid: history, batchIndex: n * chunks.length + c
               })
-            }, 55000);
-            questions.push(...validateGenerated(
-              body, chunks[c], allPrevious.concat(history)
-            ));
+                }, 45000, controller.signal);
+                chunkQuestions = validateGenerated(body, chunks[c], allPrevious.concat(history));
+                break;
+              } catch (error) {
+                const recoverable = /invalid|incomplete|repeated|JSON|question set/i.test(error.message || '');
+                if (attempt === 2 || !recoverable || controller.signal.aborted) throw error;
+                status.textContent = 'AI returned an incomplete batch. Retrying this batch once…';
+              }
+            }
+            questions.push(...chunkQuestions);
+            progress.value = (n * count) + questions.length;
+            progressLabel.textContent = progress.value + ' / ' + (batch * count) + ' questions prepared';
           }
           const title = 'AI · ' + (topic || subject.name) + ' · ' + difficulty + ' · ' +
             new Date().toLocaleDateString() + ' #' + (loadSaved().length + 1);
@@ -241,12 +286,17 @@
           created++;
           refresh();
         }
+        status.dataset.state = 'success';
         status.textContent = '✓ ' + created + ' unique AI test' + (created === 1 ? '' : 's') +
           ' created! Find them in the test cards below. Generate again for another set.';
       } catch (error) {
-        status.textContent = (created ? created + ' test(s) saved. ' : '') +
-          (error && error.message ? error.message : 'Could not generate tests.');
+        const prefix = created ? created + ' completed test(s) saved. ' : '';
+        status.textContent = prefix + (error?.message || 'Could not generate tests.');
+        status.dataset.state = 'error';
       } finally {
+        activeController = null;
+        progressWrap.hidden = true;
+        controls.forEach((input) => { input.disabled = false; });
         button.disabled = false;
         button.textContent = 'Generate AI tests';
       }
