@@ -15,12 +15,39 @@ try{
   await page.goto(site,{waitUntil:'domcontentloaded',timeout:30000});
   await page.locator('#ai-gen-form').waitFor({timeout:15000});
   console.log('Homepage generator is mounted.');
+
+  console.log('Checking Google Search shortcut in shared AI Assistant.');
+  const aiPanel=page.locator('aakash-assistant');
+  await aiPanel.locator('.launcher').waitFor({timeout:15000});
+  await aiPanel.locator('.launcher').click();
+  await aiPanel.locator('textarea').fill('root locus stability');
+  const popupPromise=page.waitForEvent('popup',{timeout:12000});
+  await aiPanel.locator('.google-search').click();
+  const popup=await popupPromise;
+  console.log('Search Google opens:',popup.url());
+  assert.ok(popup.url().startsWith('https://www.google.com/search?q='),
+    'Search Google button did not open a Google query');
+  await popup.close();
+  await aiPanel.locator('.close').click();
+
   await page.locator('#ai-gen-exam').selectOption('gate');
   await page.locator('#ai-gen-subject').selectOption('gate-nt');
   await page.locator('#ai-gen-topic').fill("Ohm's law, circuit calculations");
   await page.locator('#ai-gen-level').selectOption('Easy');
   await page.locator('#ai-gen-count').selectOption('5');
   await page.locator('#ai-gen-batch').selectOption('1');
+
+  console.log('Running 2-question browser diagnostic on the production website.');
+  await page.locator('#ai-gen-diagnostic').click();
+  await page.waitForFunction(()=>{
+    const status=document.querySelector('#ai-gen-status');
+    return status && ['success','error'].includes(status.dataset.state);
+  },null,{timeout:70000});
+  const diagnosticState=await page.locator('#ai-gen-status').getAttribute('data-state');
+  const diagnosticText=await page.locator('#ai-gen-status').textContent();
+  console.log('AI diagnostic:',diagnosticState,diagnosticText);
+  assert.equal(diagnosticState,'success','Live 2-question browser diagnostic failed');
+
   console.log('Submitting production Generate AI tests form.');
   await page.locator('#ai-gen-submit').click();
   await page.waitForFunction(()=>{
