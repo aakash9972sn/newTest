@@ -1,0 +1,23 @@
+name: Live Cloudflare AI smoke test
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/live-ai-smoke.yml"
+      - "scripts/live-ai-smoke.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live-inference:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Test the real deployed Cloudflare AI Worker (uses a small amount of free quota)
+        run: node scripts/live-ai-smoke.mjs
