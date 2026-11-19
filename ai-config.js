@@ -14,7 +14,7 @@ window.AAKASH_AI = {
     "Help me choose a GATE practice test",
   ],
   privacy:
-    "Your question and available test titles go to Cloudflare AI when you ask. Active test responses are not shared. Review AI advice against your study material.",
+    "Normal questions use Cloudflare AI. If you press Search Google in chat, your typed question goes to Google Gemini for web grounding; Google sources appear in this chat. Active test responses are not shared. Review AI advice against your study material.",
   isAllowed: () => !location.hash.startsWith("#/t/"),
   context: () => ({
     exams: (window.EXAM_DATA || []).map((exam) => ({
