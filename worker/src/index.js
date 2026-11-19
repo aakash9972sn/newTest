@@ -205,6 +205,65 @@ async function generateAI(body, env, headers) {
   }
 }
 
+
+/* Optional real Google Search grounding through Gemini 2.5 Flash-Lite.
+   The key is a Cloudflare secret (GEMINI_API_KEY), never a browser variable.
+   Existing Codex assistant remains on its original Workers AI model. */
+async function googleSearchAnswer(body, env, headers) {
+  if (!env.GEMINI_API_KEY)
+    return json({error:'Google Search needs one-time setup: add GEMINI_API_KEY as a Cloudflare Worker secret.',code:'GOOGLE_NOT_CONFIGURED'},503,headers);
+  const question=typeof body.question==='string'?body.question.trim():'';
+  if (question.length<2 || question.length>700)
+    return json({error:'Enter a question between 2 and 700 characters.'},400,headers);
+  const url='https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent';
+  const query='Search Google for up-to-date information and answer the user question in the same language. ' +
+    'Use search results when available, distinguish facts from uncertainty and provide source-grounded context. Question: ' + question;
+  let response;
+  try {
+    response=await fetch(url,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-goog-api-key':env.GEMINI_API_KEY},
+      body:JSON.stringify({
+        contents:[{role:'user',parts:[{text:query}]}],
+        tools:[{google_search:{}}],
+        generationConfig:{temperature:0.25,maxOutputTokens:1100,thinkingConfig:{thinkingBudget:0}}
+      }),
+      signal:AbortSignal.timeout(30000)
+    });
+  }catch(_){return json({error:'Google grounding service is currently unreachable. Please retry.'},503,headers)}
+  if(!response.ok){
+    if(response.status===401||response.status===403)
+      return json({error:'Google API key or project permissions are invalid. Check GEMINI_API_KEY in Cloudflare.',code:'GOOGLE_KEY_ERROR'},503,headers);
+    if(response.status===429)
+      return json({error:'Google Search free quota or rate limit reached. Please try later.',code:'GOOGLE_QUOTA'},429,headers);
+    return json({error:'Google Search service returned HTTP '+response.status+'.',code:'GOOGLE_PROVIDER_ERROR'},503,headers);
+  }
+  let result;
+  try{result=await response.json()}catch(_){return json({error:'Google returned an unreadable response.'},502,headers)}
+  const candidate=result?.candidates?.[0];
+  const answer=(candidate?.content?.parts||[]).filter(p=>typeof p?.text==='string').map(p=>p.text).join('\n').trim();
+  if(!answer)return json({error:'Google did not return an answer. Try rephrasing your question.'},502,headers);
+  const grounding=candidate?.groundingMetadata||{};
+  const sources=[];
+  for(const chunk of grounding.groundingChunks||[]){
+    const web=chunk?.web; if(!web || typeof web.uri!=='string')continue;
+    try{
+      const parsed=new URL(web.uri);
+      if(parsed.protocol!=='https:'||sources.some(src=>src.url===parsed.href))continue;
+      sources.push({title:String(web.title||parsed.hostname).slice(0,130),url:parsed.href});
+    }catch(_){}
+    if(sources.length>=6)break;
+  }
+  const searched=Boolean((grounding.webSearchQueries||[]).length ||
+    sources.length || grounding.searchEntryPoint?.renderedContent);
+  return json({
+    answer:answer.slice(0,8000),sources,
+    googleGrounded:searched,
+    suggestionHtml:typeof grounding.searchEntryPoint?.renderedContent==='string'?
+      grounding.searchEntryPoint.renderedContent.slice(0,15000):''
+  },200,headers);
+}
+
 const DEFAULT_MODEL = "@cf/google/gemma-4-26b-a4b-it";
 const GENERATION_MODEL = "@cf/qwen/qwen3.8-27b";
 const buckets = new Map();
@@ -355,6 +414,7 @@ export default {
           version: "2026-11-19-fast-v2",
           generationVersion: 4,
           generationModel: GENERATION_MODEL,
+          googleSearchConfigured: !!env.GEMINI_API_KEY,
           assistantVersion: 2,
           apps: ["shop", "portfolio", "study"],
           configured: !!env.AI,
@@ -366,7 +426,7 @@ export default {
       return json({ error: "Not permitted" }, 403, headers);
     if (!request.headers.get("Content-Type")?.startsWith("application/json"))
       return json({ error: "Use application/json" }, 415, headers);
-    if (!env.AI)
+    if (request.method === "POST" && !env.AI && !env.GEMINI_API_KEY)
       return json({ error: "AI is temporarily unavailable" }, 503, headers);
     const ip = request.headers.get("CF-Connecting-IP") || "unknown";
     if (!localLimit(ip))
@@ -396,6 +456,8 @@ export default {
     } catch {
       return json({ error: "Invalid JSON" }, 400, headers);
     }
+    if (body?.action === "google_search") return googleSearchAnswer(body, env, headers);
+    if (!env.AI) return json({error:"AI is temporarily unavailable"},503,headers);
     if (body?.action === "generate") return generateAI(body, env, headers);
     const prompt = body && typeof body === "object" ? promptFor(body) : null;
     if (!prompt)
