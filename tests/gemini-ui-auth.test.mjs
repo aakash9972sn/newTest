@@ -55,7 +55,7 @@ test('normal chat uses Gemini balanced mode with grounding disabled by default',
 
 test('Gemini design and Firebase diagnostics are present and legacy script cache is replaced',()=>{
   assert.match(html,/ai-assistant\.js\?v=20261120-gemini3/);
-  assert.match(html,/firebase-account\.js\?v=20261120-auth4/);
+  assert.match(html,/firebase-account\.js\?v=20261120-profile1/);
   assert.match(assistantSource,/Ask Gemini/);
   assert.match(assistantSource,/GOOGLE GEMINI/);
   assert.match(assistantSource,/HostedAI\.request/);
@@ -63,5 +63,6 @@ test('Gemini design and Firebase diagnostics are present and legacy script cache
   assert.match(firebaseSource,/auth\/unauthorized-domain/);
   assert.match(firebaseSource,/aakash9972sn\.github\.io/);
   assert.match(firebaseSource,/account-diagnostics/);
-  assert.match(firebaseSource,/Retry Google sign-in setup/);
+  assert.match(firebaseSource,/Google sign-in/);
+  assert.match(firebaseSource,/account-avatar/);
 });

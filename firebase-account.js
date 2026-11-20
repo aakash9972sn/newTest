@@ -1,93 +1,507 @@
-/* Firebase web config is public; it is NOT a Gemini server credential. */
+/* Google account UI + strict Firestore persistence.
+   The Firebase WEB apiKey is public project configuration, not a Gemini key.
+   Keep this file compatible with static GitHub Pages and other AAKASH pages. */
 (() => {
- const config={projectId:'gen-lang-client-0580718541',appId:'1:714373498331:web:9ca598d4603eda9c9553fe',apiKey:'AIzaSyB2M8rFSHGlke4uS1qLvh_CTpF8yxp8HQY',authDomain:'gen-lang-client-0580718541.firebaseapp.com',firestoreDatabaseId:'ai-studio-aakasheceembedde-cbb0adda-8b7b-403c-a84c-887e93610453',storageBucket:'gen-lang-client-0580718541.firebasestorage.app',messagingSenderId:'714373498331'};
- let auth,db,fs,au,loading;
- const assetBase=new URL('.',document.currentScript.src);
- const sheet=document.createElement('link');sheet.rel='stylesheet';sheet.href=new URL('firebase-account.css?v=20261120-ui2',assetBase);document.head.append(sheet);
- const bar=document.createElement('dialog');bar.className='account-panel';bar.setAttribute('aria-labelledby','cloud-account-title');
- const heading=document.createElement('h2');heading.id='cloud-account-title';heading.textContent='Your account';
- const intro=document.createElement('p');intro.className='account-intro';intro.textContent='Sign in to keep your saved activity and bookmarks together across devices.';
- const close=document.createElement('button');close.className='account-close';close.textContent='×';close.setAttribute('aria-label','Close account');close.onclick=()=>bar.close();
- const launch=document.createElement('button');launch.className='account-launcher';launch.type='button';launch.textContent='Account';launch.setAttribute('aria-haspopup','dialog');launch.onclick=()=>{bar.showModal();prepareSignIn();};bar.addEventListener('close',()=>launch.focus());
- const target=document.querySelector('.top-links, .header-actions, #main-navigation');if(target)target.append(launch);else{const row=document.createElement('div');row.className='account-fallback';row.append(launch);document.body.prepend(row);}
- const login=document.createElement('button'),bookmark=document.createElement('button'),status=document.createElement('span');login.className='account-login';login.textContent='Continue with Google';bookmark.textContent='Bookmark this page';bookmark.hidden=true;status.setAttribute('role','status');bar.append(close,heading,intro,login,bookmark,status);document.body.append(bar);
- const message=s=>status.textContent=s;
- const diagnostics=document.createElement('div');
- diagnostics.className='account-diagnostics';
- diagnostics.hidden=true;
- const info=document.createElement('p');
- const official=document.createElement('a');
- official.href='https://console.firebase.google.com/';
- official.target='_blank'; official.rel='noopener noreferrer';
- official.textContent='Open Firebase Console';
- diagnostics.append(info,official);
- bar.appendChild(diagnostics);
- function clearDiagnostic(){diagnostics.hidden=true;info.textContent='';}
+  'use strict';
 
- async function init(){if(loading)return loading;loading=(async()=>{const prefix='https://www.gstatic.com/firebasejs/11.10.0/';const [app,a,f]=await Promise.all([import(prefix+'firebase-app.js'),import(prefix+'firebase-auth.js'),import(prefix+'firebase-firestore.js')]);au=a;fs=f;const instance=app.getApps().length?app.getApp():app.initializeApp(config);auth=a.getAuth(instance);db=f.getFirestore(instance,config.firestoreDatabaseId);await new Promise((resolve,reject)=>{
-    let unsubscribe=()=>{};
-    const timeout=setTimeout(()=>{unsubscribe();reject(new Error('auth/initialization-timeout'));},15000);
-    const onReady=(user)=>{
-      clearTimeout(timeout);
-      login.textContent=user?'Sign out':'Continue with Google';
-      bookmark.hidden=!user;
-      message(user?'Signed in as '+(user.displayName||'your account'):'Progress stays on this device until you sign in.');
-      resolve();
-    };
-    try{unsubscribe=a.onAuthStateChanged(auth,onReady,(error)=>{clearTimeout(timeout);reject(error);});}
-    catch(error){clearTimeout(timeout);reject(error);}
-  });})().catch(e=>{loading=null;throw e;});return loading;}
- async function save(collection,id,data){if(!auth?.currentUser||!['testAttempts','bookmarks','orders'].includes(collection))return false;try{const uid=auth.currentUser.uid;await fs.setDoc(fs.doc(db,'users',uid,collection,String(id).replace(/\//g,'_')),{...JSON.parse(JSON.stringify(data)),updatedAt:fs.serverTimestamp()},{merge:true});message('Saved to your account.');return true;}catch{message('Cloud save unavailable. Your local progress is unchanged.');return false;}}
- function signInError(error){
-  const rawCode=error?.code||error?.message||'auth/sdk-unavailable';
-  const code=/^auth\/[a-z0-9.-]+$/.test(rawCode)?rawCode:'auth/sdk-unavailable';
-  const messages={
-   'auth/popup-blocked':'Your browser blocked the sign-in window. Allow popups for this site, then try again.',
-   'auth/popup-closed-by-user':'Sign-in was cancelled. You can continue without an account.',
-   'auth/cancelled-popup-request':'Another sign-in window is already open.',
-   'auth/unauthorized-domain':'Firebase is blocking Google sign-in because aakash9972sn.github.io is not authorized. The project owner must add this exact hostname in Firebase Console → Authentication → Settings → Authorized domains.',
-   'auth/operation-not-allowed':'Google sign-in has not been enabled for this Firebase project.',
-   'auth/invalid-api-key':'The Firebase sign-in configuration needs to be corrected.',
-   'auth/api-key-not-valid.-please-pass-a-valid-api-key.':'The Firebase sign-in configuration needs to be corrected.',
-   'auth/network-request-failed':'Could not connect to Firebase Authentication. Check your connection or privacy extensions, then retry.',
-   'auth/initialization-timeout':'Firebase is taking too long to initialize. Reload and retry.',
-   'auth/sdk-unavailable':'Sign-in could not load. Check your connection or content blocker, then reopen Account.'
+  // Exact existing Firebase project values. Never replace with a default database.
+  const firebaseConfig = {
+    apiKey: "AIzaSyB2M8rFSHGlke4uS1qLvh_CTpF8yxp8HQY",
+    authDomain: "gen-lang-client-0580718541.firebaseapp.com",
+    projectId: "gen-lang-client-0580718541",
+    storageBucket: "gen-lang-client-0580718541.firebasestorage.app",
+    messagingSenderId: "714373498331",
+    appId: "1:714373498331:web:9ca598d4603eda9c9553fe"
   };
-  message((messages[code]||'Sign-in could not finish. Please retry.')+' ('+code+')');
-  const needsOwner=['auth/unauthorized-domain','auth/operation-not-allowed','auth/invalid-api-key','auth/api-key-not-valid.-please-pass-a-valid-api-key.'].includes(code);
-  if(needsOwner){
-    diagnostics.hidden=false;
-    info.textContent=code==='auth/unauthorized-domain'?
-      'Required project setting: add aakash9972sn.github.io to Authorized domains (without https:// or /newTest/), then retry.' :
-      'The Firebase project owner must check Authentication → Sign-in method and project credentials. Changing website JavaScript will not resolve this server-side setting.';
-  } else clearDiagnostic();
- }
- async function prepareSignIn(){
-  clearDiagnostic();login.disabled=true;login.textContent='Preparing secure sign-in…';
-  try{await init();login.textContent=auth.currentUser?'Sign out':'Continue with Google';login.disabled=false;}
-  catch(error){login.textContent='Retry Google sign-in setup';login.disabled=false;signInError(error);}
- }
- login.onclick=async()=>{
-  if(!auth||!au){await prepareSignIn();return;}
-  clearDiagnostic();login.disabled=true;
-  try{
-   if(auth.currentUser){await au.signOut(auth);try{localStorage.removeItem('aakash.cloud.enabled');}catch{}return;}
-   // Open directly within the user click, before any asynchronous work.
-   const pending=au.signInWithPopup(auth,new au.GoogleAuthProvider());
-   await pending;
-   try{localStorage.setItem('aakash.cloud.enabled','1');}catch{}
-   const u=auth.currentUser;
-   try{
-    const ref=fs.doc(db,'users',u.uid),old=await fs.getDoc(ref);
-    await fs.setDoc(ref,{uid:u.uid,displayName:u.displayName||'',...(!old.exists()?{createdAt:fs.serverTimestamp()}:{}),updatedAt:fs.serverTimestamp()},{merge:true});
-    await window.AakashAccount.syncLocal();
-   }catch{message('Signed in successfully. Cloud saving is unavailable; your local progress is safe.');}
-  }catch(error){signInError(error);}
-  finally{login.disabled=false;login.textContent=auth.currentUser?'Sign out':'Continue with Google';}
- };
+  const FIRESTORE_DATABASE_ID =
+    "ai-studio-aakasheceembedde-cbb0adda-8b7b-403c-a84c-887e93610453";
+  const schema = window.AakashCloudSchema;
+  if (!schema) {
+    console.error('Cloud record validator did not load. No Firestore writes will be attempted.');
+    return;
+  }
 
- bookmark.onclick=()=>save('bookmarks',encodeURIComponent(location.pathname),{url:location.origin+location.pathname,title:document.title});
- window.AakashAccount={save,async bestGuess(score){if(!auth?.currentUser)return;try{const ref=fs.doc(db,'users',auth.currentUser.uid);await fs.runTransaction(db,async tx=>{const snap=await tx.get(ref);const old=snap.data()?.bestGuessScore;if(!old||score<old)tx.set(ref,{bestGuessScore:score,updatedAt:fs.serverTimestamp()},{merge:true});});}catch{message('Score is saved locally; cloud sync is unavailable.');}},async list(collection){if(!auth?.currentUser)return [];if(!['testAttempts','bookmarks','orders'].includes(collection))return [];return (await fs.getDocs(fs.collection(db,'users',auth.currentUser.uid,collection))).docs.map(d=>({id:d.id,...d.data()}));},async syncLocal(){for(const key of Object.keys(localStorage)){if(key.startsWith('tclab.result.')){try{const result=JSON.parse(localStorage.getItem(key));await save('testAttempts',result.testId+'-'+(result.at||'latest'),result);}catch{}}}const score=Number(localStorage.getItem('bestScore'));if(score>0)await this.bestGuess(score);}};
- const saved=document.createElement('button');saved.textContent='My saved data';saved.onclick=async()=>{if(!auth?.currentUser){message('Sign in to view your saved data.');return;}try{const dialog=document.createElement('dialog');dialog.className='account-records';dialog.setAttribute('aria-label','Your saved data');const close=document.createElement('button');close.textContent='Close';close.onclick=()=>dialog.close();dialog.append(close);for(const name of ['testAttempts','bookmarks','orders']){const h=document.createElement('h3');h.textContent=({testAttempts:'Test history',bookmarks:'Bookmarks',orders:'Order history'})[name];dialog.append(h);for(const item of await window.AakashAccount.list(name)){const p=document.createElement('p');p.textContent=item.title||item.id;if(name==='bookmarks'&&typeof item.url==='string'&&item.url.startsWith('https://aakash9972sn.github.io/')){const a=document.createElement('a');a.href=item.url;a.textContent=p.textContent;p.replaceChildren(a);}dialog.append(p);}}document.body.append(dialog);dialog.addEventListener('close',()=>dialog.remove());dialog.showModal();}catch{message('Saved data could not be loaded. Please retry.');}};bar.append(saved);
- try{if(localStorage.getItem('aakash.cloud.enabled'))init().catch(()=>message('Cloud connection unavailable. You can continue locally.'));}catch{}
+  let auth, db, fs, au, googleProvider, initialization, unsubscribeAuth;
+  let signedInUser = null;
+  let profileReady = null;
+  let profileError = null;
+  let sessionVersion = 0;
+
+  const assetBase = new URL('.', document.currentScript.src);
+  const sheet = document.createElement('link');
+  sheet.rel = 'stylesheet';
+  sheet.href = new URL('firebase-account.css?v=20261120-profile1', assetBase);
+  document.head.appendChild(sheet);
+
+  const panel = document.createElement('dialog');
+  panel.className = 'account-panel';
+  panel.setAttribute('aria-labelledby', 'cloud-account-title');
+  const heading = document.createElement('h2');
+  heading.id = 'cloud-account-title';
+  heading.textContent = 'Your account';
+  const intro = document.createElement('p');
+  intro.className = 'account-intro';
+  intro.textContent = 'Sign in to keep your test history and question bookmarks across devices.';
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.className = 'account-close';
+  close.textContent = '×';
+  close.setAttribute('aria-label', 'Close account');
+  close.addEventListener('click', () => panel.close());
+
+  const launch = document.createElement('button');
+  launch.type = 'button';
+  launch.className = 'account-launcher';
+  launch.setAttribute('aria-haspopup', 'dialog');
+  launch.setAttribute('aria-label', 'Open Google account');
+  const avatar = document.createElement('span');
+  avatar.className = 'account-avatar';
+  avatar.setAttribute('aria-hidden', 'true');
+  avatar.textContent = 'A';
+  const headerLabel = document.createElement('span');
+  headerLabel.className = 'account-header-name';
+  headerLabel.textContent = 'Account';
+  launch.append(avatar, headerLabel);
+  launch.addEventListener('click', () => {
+    if (!panel.open) panel.showModal();
+    prepareSignIn();
+  });
+  panel.addEventListener('close', () => launch.focus());
+
+  const target = document.querySelector('.top-links, .header-actions, #main-navigation');
+  if (target) target.append(launch);
+  else {
+    const row = document.createElement('div');
+    row.className = 'account-fallback';
+    row.append(launch);
+    document.body.prepend(row);
+  }
+
+  const login = document.createElement('button');
+  login.className = 'account-login';
+  login.type = 'button';
+  login.textContent = 'Continue with Google';
+  const bookmark = document.createElement('button');
+  bookmark.className = 'account-bookmark';
+  bookmark.type = 'button';
+  bookmark.textContent = 'Save current question';
+  bookmark.hidden = true;
+  const saved = document.createElement('button');
+  saved.type = 'button';
+  saved.textContent = 'My saved data';
+  const status = document.createElement('span');
+  status.setAttribute('role', 'status');
+  status.setAttribute('aria-live', 'polite');
+  panel.append(close, heading, intro, login, bookmark, saved, status);
+  document.body.appendChild(panel);
+
+  const diagnostics = document.createElement('div');
+  diagnostics.className = 'account-diagnostics';
+  diagnostics.hidden = true;
+  const hint = document.createElement('p');
+  const consoleLink = document.createElement('a');
+  consoleLink.href = 'https://console.firebase.google.com/';
+  consoleLink.target = '_blank';
+  consoleLink.rel = 'noopener noreferrer';
+  consoleLink.textContent = 'Open Firebase Console';
+  diagnostics.append(hint, consoleLink);
+  panel.append(diagnostics);
+
+  const message = (text) => { status.textContent = text; };
+  const clearDiagnostic = () => { diagnostics.hidden = true; hint.textContent = ''; };
+  const friendlyError = (error) => {
+    const code = String(error?.code || error?.message || 'unknown-error');
+    const details = {
+      'auth/popup-blocked': 'Google login popup was blocked. Allow popups for this website and try again.',
+      'auth/popup-closed-by-user': 'Google sign-in was cancelled.',
+      'auth/cancelled-popup-request': 'Another Google login popup is already open.',
+      'auth/unauthorized-domain': 'Google sign-in is blocked by Firebase: aakash9972sn.github.io is not an authorized domain.',
+      'auth/operation-not-allowed': 'Google sign-in is disabled in Firebase Authentication.',
+      'auth/network-request-failed': 'Could not contact Google sign-in. Check your connection or extensions.',
+      'auth/initialization-timeout': 'Firebase sign-in initialization timed out. Retry.',
+      'permission-denied': 'Firestore security rules denied this operation. Your local data is unchanged.',
+      'firestore/permission-denied': 'Firestore security rules denied this operation. Your local data is unchanged.',
+      'unavailable': 'Firestore is temporarily unavailable. Your local data is unchanged.'
+    };
+    const text = (details[code] || 'Account operation failed. Your local data is safe.') +
+      ' (' + code.slice(0, 80) + ')';
+    message(text);
+    if (['auth/unauthorized-domain', 'auth/operation-not-allowed'].includes(code)) {
+      diagnostics.hidden = false;
+      hint.textContent = code === 'auth/unauthorized-domain'
+        ? 'Project owner action: Firebase Console → Authentication → Settings → Authorized domains → add aakash9972sn.github.io (no https:// or /newTest/).'
+        : 'Project owner action: Firebase Console → Authentication → Sign-in method → enable Google.';
+    } else clearDiagnostic();
+    return text;
+  };
+
+  function profileLabel(user) {
+    return schema.displayName(user);
+  }
+  function setProfile(user) {
+    avatar.replaceChildren();
+    if (user) {
+      const name = profileLabel(user);
+      headerLabel.textContent = name;
+      launch.title = 'Signed in as ' + name;
+      launch.setAttribute('aria-label', 'Open account for ' + name);
+      heading.textContent = name;
+      login.textContent = 'Sign out';
+      bookmark.hidden = false;
+      let photo;
+      try {
+        if (typeof user.photoURL === 'string') {
+          const u = new URL(user.photoURL);
+          if (u.protocol === 'https:') photo = u.href;
+        }
+      } catch (_) { /* use an initial for invalid photo URLs */ }
+      if (photo) {
+        const img = document.createElement('img');
+        img.src = photo;
+        img.alt = '';
+        img.referrerPolicy = 'no-referrer';
+        img.addEventListener('error', () => {
+          avatar.textContent = Array.from(name)[0]?.toUpperCase() || 'A';
+        }, { once: true });
+        avatar.append(img);
+      } else avatar.textContent = Array.from(name)[0]?.toUpperCase() || 'A';
+    } else {
+      headerLabel.textContent = 'Account';
+      launch.title = 'Continue with Google';
+      launch.setAttribute('aria-label', 'Open Google account');
+      avatar.textContent = 'A';
+      heading.textContent = 'Your account';
+      login.textContent = 'Continue with Google';
+      bookmark.hidden = true;
+    }
+  }
+
+  // Parent exists BEFORE any subcollection writes. Never merge a create payload
+  // into an existing document: that would violate strict create/update rules.
+  async function ensureUserDocument(user) {
+    if (!user.emailVerified) throw new Error('Google email must be verified for cloud saving.');
+    const ref = fs.doc(db, 'users', user.uid);
+    let snap = await fs.getDoc(ref);
+    if (!snap.exists()) {
+      try {
+        await fs.setDoc(ref, schema.userCreate(user, () => fs.serverTimestamp()));
+      } catch (error) {
+        snap = await fs.getDoc(ref).catch(() => null);
+        if (!snap?.exists()) throw error;
+      }
+    } else {
+      const data = snap.data();
+      if (data.uid !== user.uid || !data.createdAt)
+        throw new Error('Existing account needs Firebase administrator schema migration.');
+      const patch = {};
+      if (typeof data.displayName !== 'string' || !data.displayName.trim())
+        patch.displayName = schema.displayName(user);
+      if (!['NEET UG','GATE ECE','Both'].includes(data.targetExam))
+        patch.targetExam = 'Both';
+      if (!Number.isInteger(data.bestGuessScore) || data.bestGuessScore < 0 || data.bestGuessScore > 1000)
+        patch.bestGuessScore = 0;
+      if (Object.keys(patch).length)
+        await fs.updateDoc(ref, { ...patch, updatedAt: fs.serverTimestamp() });
+    }
+    return true;
+  }
+
+  function onSignedIn(user) {
+    const version = ++sessionVersion;
+    signedInUser = user;
+    profileError = null;
+    setProfile(user);
+    clearDiagnostic();
+    if (!user) {
+      profileReady = null;
+      message('Progress stays on this device until you sign in.');
+      return;
+    }
+    if (!user.emailVerified) {
+      profileReady = Promise.resolve(false);
+      profileError = new Error('Google account email is not verified.');
+      message(profileError.message);
+      return;
+    }
+    message('Signed in. Connecting your private cloud records…');
+    profileReady = ensureUserDocument(user).then(() => {
+      if (version !== sessionVersion) return false;
+      message('Signed in as ' + profileLabel(user) + '. Cloud saving is ready.');
+      return true;
+    }).catch((error) => {
+      if (version !== sessionVersion) return false;
+      profileError = error;
+      message('Signed in, but cloud saving is unavailable: ' +
+        (error?.code || error?.message || 'unknown error'));
+      return false;
+    });
+  }
+
+  async function init() {
+    if (initialization) return initialization;
+    initialization = (async () => {
+      const prefix = 'https://www.gstatic.com/firebasejs/11.10.0/';
+      const [app, a, f] = await Promise.all([
+        import(prefix + 'firebase-app.js'),
+        import(prefix + 'firebase-auth.js'),
+        import(prefix + 'firebase-firestore.js')
+      ]);
+      au = a; fs = f;
+      const instance = app.getApps().find(x => x.name === '[DEFAULT]') ||
+        app.initializeApp(firebaseConfig);
+      auth = a.getAuth(instance);
+      // The SECOND argument is critical: this is a named Firestore database.
+      db = f.getFirestore(instance, FIRESTORE_DATABASE_ID);
+      googleProvider = new a.GoogleAuthProvider();
+      await new Promise((resolve, reject) => {
+        let completed = false;
+        const timer = setTimeout(() => {
+          if (!completed) { completed = true; reject(new Error('auth/initialization-timeout')); }
+        }, 16000);
+        try {
+          unsubscribeAuth = a.onAuthStateChanged(auth, user => {
+            onSignedIn(user);
+            if (!completed) { completed = true; clearTimeout(timer); resolve(); }
+          }, error => {
+            if (!completed) { completed = true; clearTimeout(timer); reject(error); }
+            friendlyError(error);
+          });
+        } catch (error) { clearTimeout(timer); reject(error); }
+      });
+    })().catch(error => { initialization = null; throw error; });
+    return initialization;
+  }
+
+  async function prepareSignIn() {
+    clearDiagnostic();
+    login.disabled = true;
+    login.textContent = 'Preparing secure sign-in…';
+    try {
+      await init();
+      login.disabled = false;
+      login.textContent = auth.currentUser ? 'Sign out' : 'Continue with Google';
+    } catch (error) {
+      login.disabled = false;
+      login.textContent = 'Retry Google sign-in setup';
+      friendlyError(error);
+    }
+  }
+
+  async function readyUser() {
+    if (!auth?.currentUser || !signedInUser ||
+        signedInUser.uid !== auth.currentUser.uid) throw new Error('Sign in with Google first.');
+    if (!signedInUser.emailVerified) throw new Error('A verified Google account is required.');
+    if (!profileReady || !(await profileReady)) throw profileError ||
+      new Error('Your cloud account is not ready. Check Firebase security rules.');
+    if (auth.currentUser?.uid !== signedInUser.uid)
+      throw new Error('Google session changed. Please sign in again.');
+    return signedInUser;
+  }
+
+  async function createRecord(collection, recordId, data) {
+    const user = await readyUser();
+    if (!['testAttempts','bookmarks','orders'].includes(collection))
+      throw new Error('Unsupported cloud collection.');
+    const id = String(recordId || '').replaceAll('/', '_').slice(0,180);
+    if (!id || id === '.' || id === '..') throw new Error('Invalid record identifier.');
+    const payload = collection === 'testAttempts'
+      ? schema.testAttempt(user, data, () => fs.serverTimestamp())
+      : collection === 'bookmarks'
+        ? schema.bookmark(user, data, () => fs.serverTimestamp())
+        : schema.order(user, data, () => fs.serverTimestamp());
+    const ref = fs.doc(db, 'users', user.uid, collection, id);
+    // These collections allow LIST + CREATE, but no UPDATE. A collection list
+    // avoids relying on separate per-document GET permissions in strict rules.
+    const listed = await fs.getDocs(fs.collection(db,'users',user.uid,collection));
+    if (listed.docs.some(doc => doc.id === id)) return true;
+    await fs.setDoc(ref, payload);  // CREATE only; no merge or extra fields.
+    return true;
+  }
+
+  const api = {
+    async save(collection, id, data) {
+      if (!auth?.currentUser) return false;
+      try {
+        const result = await createRecord(collection,id,data);
+        message('Saved to your Google account.');
+        return result;
+      } catch (error) {
+        friendlyError(error);
+        return false;
+      }
+    },
+    async list(collection) {
+      try {
+        const user = await readyUser();
+        if (!['testAttempts','bookmarks','orders'].includes(collection)) return [];
+        const snapshot = await fs.getDocs(fs.collection(db,'users',user.uid,collection));
+        return snapshot.docs.map(d => ({id:d.id,...d.data()}));
+      } catch (error) {
+        friendlyError(error);
+        return [];
+      }
+    },
+    async remove(collection,id) {
+      if (!['testAttempts','bookmarks'].includes(collection)) return false;
+      try {
+        const user = await readyUser();
+        await fs.deleteDoc(fs.doc(db,'users',user.uid,collection,String(id)));
+        message('Deleted from your Google account.');
+        return true;
+      } catch (error) { friendlyError(error); return false; }
+    },
+    async cancelOrder(id) {
+      try {
+        const user = await readyUser();
+        const ref = fs.doc(db,'users',user.uid,'orders',String(id));
+        const listed = await fs.getDocs(fs.collection(db,'users',user.uid,'orders'));
+        const orderDoc = listed.docs.find(doc => doc.id === String(id));
+        if (!orderDoc) throw new Error('Order not found.');
+        if (orderDoc.data().status === 'cancelled') return true;
+        await fs.updateDoc(ref,{status:'cancelled'}); // EXACT only allowed update.
+        message('Order status updated to cancelled.');
+        return true;
+      } catch (error) { friendlyError(error); return false; }
+    },
+    async bestGuess(score) {
+      if (!Number.isInteger(score)||score<0||score>1000) return false;
+      try {
+        const user = await readyUser();
+        const ref = fs.doc(db,'users',user.uid);
+        await fs.runTransaction(db, async tx => {
+          const snap = await tx.get(ref);
+          if (!snap.exists()) throw new Error('Create a Google account first.');
+          const old = snap.data().bestGuessScore;
+          if (old === 0 || score < old)
+            tx.update(ref,{bestGuessScore:score,updatedAt:fs.serverTimestamp()});
+        });
+        return true;
+      } catch (error) { friendlyError(error); return false; }
+    },
+    async syncLocal() {
+      if (!auth?.currentUser) return;
+      try { await readyUser(); } catch (error) { friendlyError(error); return; }
+      for (const key of Object.keys(localStorage)) {
+        if (!key.startsWith('tclab.result.')) continue;
+        try {
+          const result = JSON.parse(localStorage.getItem(key));
+          if (result?.testId && Number.isInteger(result.at))
+            await this.save('testAttempts',result.testId+'-'+result.at,result);
+        } catch (error) {
+          friendlyError(error);
+        }
+      }
+      const score = Number(localStorage.getItem('bestScore'));
+      if (Number.isInteger(score) && score > 0 && score <= 1000)
+        await this.bestGuess(score);
+    },
+    getUser() { return signedInUser; }
+  };
+  window.AakashAccount = api;
+
+  // Popup MUST be started directly inside the user click, without awaiting
+  // an initialization promise first; browsers otherwise block it.
+  login.addEventListener('click', async () => {
+    if (!auth || !au) { await prepareSignIn(); return; }
+    clearDiagnostic();
+    login.disabled = true;
+    try {
+      if (auth.currentUser) {
+        await au.signOut(auth);
+        localStorage.removeItem('aakash.cloud.enabled');
+        return;
+      }
+      const pending = au.signInWithPopup(auth,googleProvider);
+      const credential = await pending;
+      if (!credential.user?.emailVerified)
+        throw new Error('A verified Google account is required.');
+      localStorage.setItem('aakash.cloud.enabled','1');
+      if (profileReady && (await profileReady))
+        await api.syncLocal();
+      else message('Google sign-in succeeded, but Firestore saving needs attention.');
+    } catch (error) { friendlyError(error); }
+    finally {
+      login.disabled = false;
+      login.textContent = auth?.currentUser ? 'Sign out' : 'Continue with Google';
+    }
+  });
+
+  // Old "bookmark this page" sent {url,title}, which violates the deployed
+  // question-bookmark schema. Only a real current question is persisted.
+  bookmark.addEventListener('click', async () => {
+    const candidate = window.AakashTestCentre?.getCurrentBookmark?.();
+    if (!candidate) {
+      message('Open a test question to save a question bookmark.');
+      return;
+    }
+    bookmark.disabled = true;
+    const id = 'question-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7);
+    try { await api.save('bookmarks',id,candidate); }
+    finally { bookmark.disabled = false; }
+  });
+
+  saved.addEventListener('click', async () => {
+    if (!auth?.currentUser) { message('Sign in first to view your cloud data.'); return; }
+    const records = document.createElement('dialog');
+    records.className = 'account-records';
+    records.setAttribute('aria-label','Your saved data');
+    const closeRecords = document.createElement('button');
+    closeRecords.type = 'button';
+    closeRecords.textContent = 'Close';
+    closeRecords.addEventListener('click',()=>records.close());
+    records.append(closeRecords);
+    try {
+      for(const collection of ['testAttempts','bookmarks','orders']) {
+        const title = document.createElement('h3');
+        title.textContent = ({
+          testAttempts:'Test history',bookmarks:'Question bookmarks',orders:'Order history'
+        })[collection];
+        records.append(title);
+        const rows = await api.list(collection);
+        if (!rows.length) {
+          const empty=document.createElement('p');empty.textContent='No saved records.';
+          records.append(empty);
+        }
+        for(const item of rows) {
+          const row = document.createElement('div');
+          row.className = 'account-record';
+          const description=document.createElement('p');
+          description.textContent=collection==='testAttempts'
+            ? item.exam+' · '+item.subject+' · '+item.score+'/'+item.maxScore
+            : collection==='bookmarks'?item.question
+              : item.orderCode+' · ₹'+item.totalInr+' · '+item.status;
+          row.append(description);
+          if(collection==='orders' && item.status==='confirmed') {
+            const cancel = document.createElement('button');
+            cancel.textContent='Cancel order';
+            cancel.addEventListener('click', async()=>{
+              if(await api.cancelOrder(item.id)){cancel.disabled=true;description.textContent+=' · cancelled';}
+            });
+            row.append(cancel);
+          } else if(collection!=='orders'){
+            const del=document.createElement('button');
+            del.textContent='Delete';
+            del.addEventListener('click',async()=>{
+              if(await api.remove(collection,item.id))row.remove();
+            });
+            row.append(del);
+          }
+          records.append(row);
+        }
+      }
+    } catch (error) { friendlyError(error); }
+    document.body.append(records);
+    records.addEventListener('close',()=>records.remove(),{once:true});
+    records.showModal();
+  });
+
+  window.addEventListener('pagehide',()=>{
+    // No Firestore onSnapshot listeners are installed. Cleanup the auth observer.
+    if (unsubscribeAuth) { unsubscribeAuth(); unsubscribeAuth = null; }
+  },{once:true});
+
+  try {
+    if (localStorage.getItem('aakash.cloud.enabled'))
+      init().catch(friendlyError);
+  } catch (_) { /* local-only mode works without browser storage */ }
 })();
