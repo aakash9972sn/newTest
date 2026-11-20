@@ -19,7 +19,7 @@
   $(".welcome p").textContent = config.intro || "Ask about this page.";
   $(".privacy").textContent =
     config.privacy ||
-    "Your question and public page context are sent to Cloudflare AI when you ask. Do not include private details.";
+    "Your question and public page context are sent to Google Gemini when you ask. Do not include private details.";
   let history = [],
     busy = false,
     controller,
@@ -95,7 +95,7 @@
     lastQuestion = question;
     input.value = "";
     try {
-      const response = await fetch(config.endpoint, {
+      const response = await window.HostedAI.transport(config.endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "google_search", question: question.slice(0, 700) }),
@@ -151,15 +151,15 @@
     if (question) input.value = question;
     input.focus();
     // Explain the one-time setup visibly instead of pretending search is ready.
-    fetch(config.endpoint.replace(/\/$/, "") + "/health", {
+    window.HostedAI.transport(config.endpoint.replace(/\/$/, "") + "/health", {
       signal: AbortSignal.timeout(7000)
     }).then((res) => res.json()).then((health) => {
-      if (health.googleSearchConfigured === true) {
+      if (health.configured === true) {
         google.textContent = "Search Google in chat";
         google.title = "Ask Google-grounded AI here, with citations.";
-      } else if (health.googleSearchConfigured === false) {
+      } else if (health.configured === false) {
         google.textContent = "Google Search · setup required";
-        google.title = "Configure GEMINI_API_KEY as a Cloudflare Worker secret first.";
+        google.title = "The hosted AI service is not configured yet.";
       }
     }).catch(() => { /* keep search button; actual call reports any issue */ });
   }
@@ -223,7 +223,7 @@
     lastQuestion = question;
     input.value = "";
     try {
-      const response = await fetch(config.endpoint, {
+      const response = await window.HostedAI.transport(config.endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

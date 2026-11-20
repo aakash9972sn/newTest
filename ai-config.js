@@ -1,6 +1,6 @@
-// Cloudflare Workers AI endpoint (free tier)
+// Hosted Gemini backend; no private keys in the browser
 window.TEST_CENTRE_AI_ENDPOINT =
-  "https://aakash-test-ai.aakashinfinity72.workers.dev";
+  "https://ais-pre-wdyrf6yb4psuwizvqpn4hw-374223411049.asia-northeast1.run.app";
 
 window.AAKASH_AI = {
   endpoint: window.TEST_CENTRE_AI_ENDPOINT,
@@ -14,7 +14,7 @@ window.AAKASH_AI = {
     "Help me choose a GATE practice test",
   ],
   privacy:
-    "Normal questions use Cloudflare AI. If you press Search Google in chat, your typed question goes to Google Gemini for web grounding; Google sources appear in this chat. Active test responses are not shared. Review AI advice against your study material.",
+    "Questions go to Google Gemini through the hosted backend. Search Google adds web grounding. Active test responses are not shared. Review AI advice against your study material.",
   isAllowed: () => !location.hash.startsWith("#/t/"),
   context: () => ({
     exams: (window.EXAM_DATA || []).map((exam) => ({

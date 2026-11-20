@@ -97,21 +97,21 @@
     externalSignal?.addEventListener('abort', relayAbort, { once: true });
     const timer = setTimeout(() => { timedOut = true; controller.abort(); }, ms);
     try {
-      const response = await fetch(url, { ...options, signal: controller.signal });
+      const response = await window.HostedAI.transport(url, { ...options, signal: controller.signal });
       const body = await response.json().catch(() => null);
       if (!response.ok) {
         throw new Error((body && body.error) ||
-          ('AI server returned HTTP ' + response.status + '. Check Cloudflare deployments.'));
+          ('AI server returned HTTP ' + response.status + '. Check the AI service.'));
       }
       return body;
     } catch (error) {
       if (error && error.name === 'AbortError') {
         if (externalSignal?.aborted && !timedOut) throw new Error('Generation cancelled.');
         throw new Error('AI did not respond within ' + Math.round(ms / 1000) +
-          ' seconds. Try again or check Cloudflare Worker logs.');
+          ' seconds. Try again or check your connection.');
       }
       if (error instanceof TypeError) {
-        throw new Error('Cannot reach the Cloudflare Worker. Check its deployment, URL, and AI binding.');
+        throw new Error('Cannot reach the AI service. Check your connection and retry.');
       }
       throw error;
     } finally {
@@ -123,23 +123,8 @@
   async function checkBackend(signal) {
     const workerUrl = endpoint();
     const healthUrl = workerUrl.replace(/\/$/, '') + '/health';
-    let health;
-    try {
-      health = await fetchWithDeadline(healthUrl, { method: 'GET' }, 10000, signal);
-    } catch (error) {
-      if (error && /403|404|Not permitted/.test(error.message)) {
-        throw new Error('Cloudflare is using the old Worker code. Check Workers & Pages → aakash-test-ai → Deployments.');
-      }
-      throw error;
-    }
-    if (!health || health.ok !== true ||
-      !Array.isArray(health.features) || !health.features.includes('generate') ||
-      health.generationVersion !== 4) {
-      throw new Error('Cloudflare is still using the old AI model. Deploy latest GitHub main to Workers & Pages → aakash-test-ai → Deployments.');
-    }
-    if (!health.aiBinding) {
-      throw new Error('Cloudflare Worker is missing the Workers AI binding (name: AI).');
-    }
+    const health = await fetchWithDeadline(healthUrl, {method:'GET'}, 10000, signal);
+    if (!health?.ok || !health.configured) throw new Error('The hosted AI service is not configured yet.');
   }
 
   function mount(exams, register, refresh) {
@@ -261,7 +246,7 @@
       progressLabel.textContent = '0 / ' + (batch * count) + ' questions';
       let created = 0;
       try {
-        status.textContent = 'Checking Cloudflare AI connection…';
+        status.textContent = 'Checking Google Gemini connection…';
         await checkBackend(controller.signal);
         for (let n = 0; n < batch; n++) {
           const questions = [];

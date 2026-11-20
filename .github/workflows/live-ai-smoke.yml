@@ -1,10 +1,10 @@
-name: Live Cloudflare AI smoke test
+name: Hosted Gemini health check
 
 on:
   push:
     branches: [main]
     paths:
-      - "worker/src/index.js"
+      - "hosted-ai.js"
       - "scripts/live-ai-smoke.mjs"
       - ".github/workflows/live-ai-smoke.yml"
   pull_request:
@@ -26,5 +26,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Test deployed Qwen model and 5-question generation (consumes free quota)
+      - name: Check hosted backend health
         run: node scripts/live-ai-smoke.mjs

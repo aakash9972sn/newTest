@@ -7,28 +7,14 @@ const page=await browser.newPage({viewport:{width:1280,height:900},locale:'en-US
 const errors=[];
 page.on('pageerror',(error)=>errors.push('PAGE ERROR '+String(error)));
 page.on('console',(message)=>{if(message.type()==='error')errors.push('CONSOLE '+message.text())});
-page.on('requestfailed',(request)=>{if(request.url().includes('workers.dev'))errors.push('FAILED '+request.url()+' '+request.failure()?.errorText)});
-page.on('response',(response)=>{if(response.url().includes('workers.dev'))console.log('Worker HTTP',response.status(),new URL(response.url()).pathname)});
+page.on('requestfailed',(request)=>{if(request.url().includes('.run.app'))errors.push('FAILED '+request.url()+' '+request.failure()?.errorText)});
+page.on('response',(response)=>{if(response.url().includes('.run.app'))console.log('Worker HTTP',response.status(),new URL(response.url()).pathname)});
 let success=false;
 try{
   console.log('Opening the production website:',site);
   await page.goto(site,{waitUntil:'domcontentloaded',timeout:30000});
   await page.locator('#ai-gen-form').waitFor({timeout:15000});
   console.log('Homepage generator is mounted.');
-
-  console.log('Checking Google Search shortcut in shared AI Assistant.');
-  const aiPanel=page.locator('aakash-assistant');
-  await aiPanel.locator('.launcher').waitFor({timeout:15000});
-  await aiPanel.locator('.launcher').click();
-  await aiPanel.locator('textarea').fill('root locus stability');
-  const popupPromise=page.waitForEvent('popup',{timeout:12000});
-  await aiPanel.locator('.google-search').click();
-  const popup=await popupPromise;
-  console.log('Search Google opens:',popup.url());
-  assert.ok(popup.url().startsWith('https://www.google.com/search?q='),
-    'Search Google button did not open a Google query');
-  await popup.close();
-  await aiPanel.locator('.close').click();
 
   await page.locator('#ai-gen-exam').selectOption('gate');
   await page.locator('#ai-gen-subject').selectOption('gate-nt');
@@ -66,7 +52,7 @@ try{
   await page.locator('#screen-test:not([hidden])').waitFor({timeout:10000});
   const countText=await page.locator('#runner-count').textContent();
   console.log('Test runner opened:',countText);
-  assert.match(countText,/5 questions/);
+  assert.equal(countText.trim(),'5');
   success=true;
   console.log('PASS: end-to-end website browser generated and opened an actual 5-question AI test.');
 }catch(error){

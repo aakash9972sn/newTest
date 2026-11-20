@@ -109,9 +109,14 @@
       box.appendChild(status);
       body.appendChild(box);
 
-      button.addEventListener('click', () => {
-        const selected = result.responses[i];
-        openAssistant(questionPrompt(q, selected, result.exam, result.subject), status);
+      button.addEventListener('click', async () => {
+        button.disabled = true; status.hidden = false; status.textContent = 'Preparing explanation…';
+        try {
+          const data = await window.HostedAI.request({action:'doubt',question:{exam:result.exam,subject:result.subject,question:q.q,options:q.o,correctIndex:q.a,selectedIndex:result.responses[i]??null,userDoubt:'Explain the solution step by step and check the supplied answer key.'}},AbortSignal.timeout(60000));
+          if(typeof data.answer!=='string'||!data.answer.trim())throw new Error('No explanation returned.');
+          status.textContent=data.answer;
+        } catch(error){status.textContent=error.message||'Explanation unavailable. Please retry.';}
+        finally {button.disabled=false;}
       });
     });
   }

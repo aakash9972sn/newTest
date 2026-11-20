@@ -511,6 +511,7 @@
       at: Date.now()
     };
     store.set(RKEY(run.test.id), result);
+    window.AakashAccount?.save('testAttempts', result.testId+'-'+result.at, result);
     store.del(PKEY(run.test.id));
     const prevBest = store.get(BKEY(run.test.id), null);
     if (!prevBest || score > prevBest.score) store.set(BKEY(run.test.id), { score: score, total: totalMarks, at: Date.now() });

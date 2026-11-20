@@ -1,3 +1,7 @@
+# Current backend
+
+The browser now uses the hosted Google Gemini service and Firebase. See [HOSTED-BACKEND.md](HOSTED-BACKEND.md). The Worker notes below describe historical code only.
+
 # Test Centre engineering notes
 
 ## Components
