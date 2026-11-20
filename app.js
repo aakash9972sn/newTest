@@ -138,7 +138,7 @@
       const active = t.id === filterExam ? ' is-active' : '';
       const exam = EXAMS.find((e) => e.id === t.id);
       const style = exam ? ' style="--tab-accent:' + exam.accent + '"' : '';
-      return '<button type="button" class="tab' + active + '" data-exam="' + esc(t.id) + '"' + style + '>' + esc(t.name) + '</button>';
+      return '<button type="button" class="tab' + active + '" aria-pressed="' + (t.id === filterExam) + '" data-exam="' + esc(t.id) + '"' + style + '>' + esc(t.name) + '</button>';
     }).join('');
     $$('#exam-tabs .tab').forEach((btn) => btn.addEventListener('click', () => {
       filterExam = btn.dataset.exam;
@@ -245,6 +245,7 @@
       '<div class="card-tags"><span class="tag tag-exam">' + esc(x.exam.name) + '</span><span class="tag">' + esc(x.subject.name) + '</span>' +
       (test.level ? '<span class="tag tag-level">' + esc(test.level) + '</span>' : '') + '</div>' +
       '<h3 class="card-title">' + esc(test.title) + '</h3>' +
+      (test.pyp ? '<p class="paper-date">' + esc(test.date) + '</p><p class="paper-note">Full paper · 1 disputed question excluded from score</p>' : '') +
       '<dl class="card-meta">' +
       '<div><dt>Questions</dt><dd>' + qs + '</dd></div>' +
       '<div><dt>Time</dt><dd>' + test.duration + ' min</dd></div>' +
@@ -292,14 +293,16 @@
     };
   }
 
-  function saveProgress() {
+  function saveProgress(paused = false) {
     if (!run) return;
+    if (Number.isFinite(run.deadline)) run.timeLeft = Core.remaining(run.deadline);
     store.set(PKEY(run.test.id), {
       responses: run.responses,
       marked: run.marked,
       visited: run.visited,
       current: run.current,
       timeLeft: run.timeLeft,
+      deadline: paused ? null : run.deadline,
       updated: Date.now()
     });
   }
@@ -309,6 +312,7 @@
     $('#runner-sub').textContent = run.entry.exam.name + ' · ' + run.entry.subject.name;
     $('#runner-count').textContent = String(run.questions.length);
     $('#runner-marking').textContent = 'Marking ' + markLabel(run.test);
+    $('#runner-note').textContent = run.test.pyp ? run.test.sourceNote + ' Save & exit pauses the timer.' : 'Save & exit pauses the timer. The timer continues while this attempt is open.';
     renderPalette();
     updateProgressBar();
     updateTimerText();
@@ -380,6 +384,7 @@
   }
 
   function goToQuestion(i) {
+    if (expired()) return;
     run.current = clamp(i, 0, run.questions.length - 1);
     run.visited[run.current] = true;
     renderQuestion();
@@ -393,11 +398,13 @@
     const q = run.questions[i];
     $('#q-index').textContent = 'Question ' + (i + 1) + ' of ' + run.questions.length;
     $('#q-topic').textContent = q.t || '';
+    $('#q-source-note').hidden = !q.unscored;
+    $('#q-source-note').textContent = q.unscored ? 'Review-only: the source flags a disputed answer key. This question does not affect your score.' : '';
     $('#q-text').textContent = q.q;
     const letters = ['A', 'B', 'C', 'D', 'E', 'F'];
     $('#q-options').innerHTML = q.o.map((opt, oi) => {
       const selected = run.responses[i] === oi;
-      return '<button type="button" class="opt' + (selected ? ' is-selected' : '') + '" data-oi="' + oi + '">' +
+      return '<button type="button" class="opt' + (selected ? ' is-selected' : '') + '" aria-pressed="' + selected + '" data-oi="' + oi + '">' +
         '<span class="opt-key">' + letters[oi] + '</span><span class="opt-text">' + esc(opt) + '</span></button>';
     }).join('');
     $$('#q-options .opt').forEach((btn) => btn.addEventListener('click', () => selectOption(Number(btn.dataset.oi))));
@@ -409,22 +416,25 @@
   }
 
   function selectOption(oi) {
+    if (expired()) return;
     run.responses[run.current] = oi;
-    $$('#q-options .opt').forEach((btn) => btn.classList.toggle('is-selected', Number(btn.dataset.oi) === oi));
+    $$('#q-options .opt').forEach((btn) => { const selected = Number(btn.dataset.oi) === oi; btn.classList.toggle('is-selected', selected); btn.setAttribute('aria-pressed', String(selected)); });
     renderPalette();
     updateProgressBar();
     saveProgress();
   }
 
   function clearResponse() {
+    if (expired()) return;
     run.responses[run.current] = null;
-    $$('#q-options .opt').forEach((btn) => btn.classList.remove('is-selected'));
+    $$('#q-options .opt').forEach((btn) => { btn.classList.remove('is-selected'); btn.setAttribute('aria-pressed', 'false'); });
     renderPalette();
     updateProgressBar();
     saveProgress();
   }
 
   function toggleMark() {
+    if (expired()) return;
     run.marked[run.current] = !run.marked[run.current];
     $('#btn-mark').classList.toggle('is-on', run.marked[run.current]);
     $('#btn-mark').setAttribute('aria-pressed', String(run.marked[run.current]));
@@ -433,10 +443,11 @@
   }
 
   function nextQuestion() {
+    if (expired()) return;
     if (run.current < run.questions.length - 1) goToQuestion(run.current + 1);
     else askSubmit();
   }
-  function prevQuestion() { if (run.current > 0) goToQuestion(run.current - 1); }
+  function prevQuestion() { if (expired()) return; if (run.current > 0) goToQuestion(run.current - 1); }
 
   function paletteIsMobile() { return window.matchMedia('(max-width: 900px)').matches; }
   function openPalette() {
@@ -504,6 +515,7 @@
       score: score,
       total: totalMarks,
       correct: correct,
+      excluded: excluded,
       wrong: wrong,
       unattempted: unattempted,
       accuracy: accuracy,
@@ -532,10 +544,10 @@
     const answered = run.responses.filter((r) => r !== null && r !== undefined).length;
     modal({
       title: 'Leave the test?',
-      body: '<p>Your progress is saved, so you can resume later. You have answered <b>' + answered + '</b> of <b>' + run.questions.length + '</b>.</p>',
+      body: '<p>Save & exit pauses the timer and saves your progress so you can resume later. You have answered <b>' + answered + '</b> of <b>' + run.questions.length + '</b>.</p>',
       confirm: 'Save & exit',
       cancel: 'Stay',
-      onConfirm: () => { saveProgress(); run = null; go('#/'); }
+      onConfirm: () => { if (expired()) return; saveProgress(true); run = null; go('#/'); }
     });
   }
 
@@ -544,7 +556,8 @@
     stopTimer();
     setScreen('result');
     const result = lastResult && lastResult.testId === entry.test.id ? lastResult : store.get(RKEY(entry.test.id), null);
-    if (!result) { go('#/'); return; }
+    if (!result || !Array.isArray(result.responses) || !result.topics) { go('#/'); return; }
+    solutionFilter = 'all';
     const questions = questionsOf(entry.test);
     const pct = result.total ? Math.round((Math.max(0, result.score) / result.total) * 100) : 0;
     $('#result-body').innerHTML =
@@ -559,6 +572,7 @@
       scoreRow('Correct', result.correct, 'good') +
       scoreRow('Wrong', result.wrong, 'bad') +
       scoreRow('Unattempted', result.unattempted, 'neutral') +
+      (result.excluded ? scoreRow('Review-only (not scored)', result.excluded, 'neutral') : '') +
       scoreRow('Accuracy', result.accuracy + '%', 'accent') +
       scoreRow('Time used', fmtTime(result.timeUsed) + ' / ' + fmtTime(result.totalTime), 'neutral') +
       '</div></div>' +
@@ -569,7 +583,7 @@
       '</div>' +
       (Object.keys(result.topics).length > 1 ? topicBreakdown(result.topics) : '');
     $('#res-home').addEventListener('click', () => go('#/'));
-    $('#res-retake').addEventListener('click', () => { store.del(RKEY(result.testId)); go('#/t/' + result.testId); });
+    $('#res-retake').addEventListener('click', () => { store.del(RKEY(result.testId)); lastResult = null; go('#/t/' + result.testId); });
     $('#res-review').addEventListener('click', () => { $('#solutions').hidden = false; $('#solutions').scrollIntoView({ behavior: 'smooth' }); });
     renderSolutions(entry, result, questions);
     if (window.TestCentreAI) window.TestCentreAI.mount(result, questions);
@@ -599,7 +613,8 @@
       { id: 'all', label: 'All (' + questions.length + ')' },
       { id: 'wrong', label: 'Wrong (' + result.wrong + ')' },
       { id: 'correct', label: 'Correct (' + result.correct + ')' },
-      { id: 'skipped', label: 'Skipped (' + result.unattempted + ')' }
+      { id: 'skipped', label: 'Skipped (' + result.unattempted + ')' },
+      ...(result.excluded ? [{ id: 'excluded', label: 'Review-only (' + result.excluded + ')' }] : [])
     ];
     wrap.innerHTML =
       '<div class="solutions-head"><h2>Solutions &amp; explanations</h2>' +
@@ -613,20 +628,21 @@
     const list = $('#solution-list');
     questions.forEach((q, i) => {
       const r = result.responses[i];
-      const state = (r === null || r === undefined) ? 'skipped' : (r === q.a ? 'correct' : 'wrong');
+      const state = Core.state(q, r);
       if (solutionFilter !== 'all' && solutionFilter !== state) return;
-      const badge = { correct: 'Correct', wrong: 'Wrong', skipped: 'Skipped' }[state];
+      const badge = { correct: 'Correct', wrong: 'Wrong', skipped: 'Skipped', excluded: 'Review-only' }[state];
       const opts = q.o.map((opt, oi) => {
         let cls = 'opt-static';
-        if (oi === q.a) cls += ' is-correct';
-        else if (oi === r) cls += ' is-wrong';
+        if (!q.unscored && oi === q.a) cls += ' is-correct';
+        else if (!q.unscored && oi === r) cls += ' is-wrong';
+        else if (q.unscored && oi === r) cls += ' is-selected';
         return '<div class="' + cls + '"><span class="opt-key">' + letters[oi] + '</span><span class="opt-text">' + esc(opt) + '</span></div>';
       }).join('');
       list.insertAdjacentHTML('beforeend',
         '<details data-ai-qindex="' + i + '" class="solution is-' + state + '"' + (solutionFilter !== 'all' ? ' open' : '') + '>' +
         '<summary><span class="sol-num">' + (i + 1) + '</span><span class="sol-q">' + esc(q.q) + '</span><span class="sol-badge">' + badge + '</span></summary>' +
         '<div class="sol-body"><div class="sol-opts">' + opts + '</div>' +
-        '<div class="sol-explain"><b>Explanation.</b> ' + esc(q.e || '—') + '</div></div></details>');
+        '<div class="sol-explain"><b>' + (q.sourceAnswer ? 'Source answer note.' : 'Explanation.') + '</b> ' + esc(q.e || '—') + '</div></div></details>');
     });
     if (!list.children.length) list.innerHTML = '<p class="muted">Nothing to show for this filter.</p>';
     if (window.TestCentreAI) window.TestCentreAI.mountSolutions(result, questions);
@@ -694,7 +710,7 @@
         }
         return;
       }
-      if (e.target.matches('input, textarea')) return;
+      if (e.target.closest('input, textarea, select, [contenteditable="true"], [role="dialog"]')) return;
       const key = e.key;
       if (/^[1-9]$/.test(key)) { const n = Number(key) - 1; if (run && n < run.questions[run.current].o.length) selectOption(n); }
       else if (key === 'ArrowRight') { saveProgress(); nextQuestion(); }
