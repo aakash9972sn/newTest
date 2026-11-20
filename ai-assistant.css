@@ -344,3 +344,37 @@ footer {
 .google-suggestions{width:100%;min-height:110px;margin-top:8px;border:0;display:block;
   background:white;border-radius:8px}
 footer{flex-wrap:wrap;gap:8px}
+
+
+/* Aakash Gemini UI refresh — overrides the legacy green assistant skin. */
+:host{--ink:#1b2d57;--paper:#f8faff;--accent:#dce8ff;
+  font-family:Inter,ui-sans-serif,system-ui,-apple-system,sans-serif;}
+.launcher{background:linear-gradient(120deg,#273ba1,#6453b7);border-color:#8379dc;
+  color:#fff;box-shadow:0 10px 36px #171a693e;font-weight:750;font-size:14px}
+.launcher span{color:#fff}
+.launcher:hover{box-shadow:0 14px 42px #2522a656}
+dialog{border:1px solid #cad5fa;border-radius:22px;background:#f9faff;color:#18284d}
+header{background:linear-gradient(130deg,#e8f0ff,#f1edff);
+  border-bottom:1px solid #d8dff5;padding:22px}
+.mark{background:linear-gradient(135deg,#4f6cf3,#9360de);color:white;border-radius:14px}
+.eyebrow{color:#4b5492;font-size:9px;letter-spacing:.9px;line-height:1.45}
+h2{font-size:20px;color:#212b55;font-weight:750}
+.welcome .spark{color:#6354c3}
+.welcome p{color:#485b77;font-size:13px}
+.suggestions button{background:#f2f5ff;border-color:#d6ddf6;color:#203058;font-size:13px}
+.suggestions button:hover{background:#e7edff}
+.message{border-color:#dbe2f6;background:#fff}
+.message.user{background:#e7ecff;border-color:#d8dffa}
+.message b{color:#394fa4;font-size:11px}
+.message p{color:#1d2b4d;line-height:1.7}
+.status{color:#435e9e}
+form{border-color:#b6c6ed}
+.send{background:linear-gradient(135deg,#415de1,#7958cd)}
+footer{color:#4e6182}
+.clear{color:#4b4fa1}
+.privacy{color:#667492}
+.google-search{background:#e3e9ff;color:#293c94;border-color:#bfcaf6;font-size:11px}
+.google-search:hover{background:#d4deff;color:#253c96}
+.google-citations{background:#edf2ff;color:#25355c}
+.google-citations a{color:#3454b8}
+@media(max-width:520px){h2{font-size:19px}}
