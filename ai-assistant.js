@@ -8,7 +8,7 @@
   const arrow = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 19 19 5M5 5h14v14"/></svg>';
   const host = document.createElement("aakash-assistant");
   const root = host.attachShadow({ mode: "open" });
-  root.innerHTML = `<link rel="stylesheet" href="${new URL("ai-assistant.css?v=20261119-google1", assetBase)}"><button class="launcher" aria-haspopup="dialog" aria-label="Open AI assistant"><span aria-hidden="true">${spark}</span> Ask AI</button><dialog aria-labelledby="assistant-title"><header><div class="mark" aria-hidden="true">${spark}</div><div><span class="eyebrow">A LITTLE HELP, WHEN YOU NEED IT</span><h2 id="assistant-title"></h2></div><button class="close" aria-label="Close AI assistant">×</button></header><div class="conversation"><div class="welcome"><span class="spark" aria-hidden="true">${spark}</span><h3>What’s on your mind?</h3><p></p><div class="suggestions"></div></div><div class="messages" role="log" aria-label="Conversation" aria-live="polite"></div></div><div class="status" role="status"></div><form><label class="sr-only" for="ai-question">Your question</label><textarea id="ai-question" rows="2" maxlength="700" placeholder="Ask in English or Hindi…" required></textarea><button class="send" aria-label="Send question">${arrow}</button></form><footer><span>AI can make mistakes. Check the source details.</span><button type="button" class="clear">Clear chat</button></footer><p class="privacy"></p></dialog>`;
+  root.innerHTML = `<link rel="stylesheet" href="${new URL("ai-assistant.css?v=20261120-gemini2", assetBase)}"><button class="launcher" aria-haspopup="dialog" aria-label="Open Aakash Gemini assistant"><span aria-hidden="true">${spark}</span> Ask Gemini</button><dialog aria-labelledby="assistant-title"><header><div class="mark" aria-hidden="true">${spark}</div><div><span class="eyebrow">GOOGLE GEMINI · STUDY ASSISTANT</span><h2 id="assistant-title"></h2></div><button class="close" aria-label="Close AI assistant">×</button></header><div class="conversation"><div class="welcome"><span class="spark" aria-hidden="true">${spark}</span><h3>What’s on your mind?</h3><p></p><div class="suggestions"></div></div><div class="messages" role="log" aria-label="Conversation" aria-live="polite"></div></div><div class="status" role="status"></div><form><label class="sr-only" for="ai-question">Your question</label><textarea id="ai-question" rows="2" maxlength="700" placeholder="Ask in English or Hindi…" required></textarea><button class="send" aria-label="Send question">${arrow}</button></form><footer><span>AI can make mistakes. Check the source details.</span><button type="button" class="clear">Clear chat</button></footer><p class="privacy"></p></dialog>`;
   document.body.appendChild(host);
   const $ = (s) => root.querySelector(s),
     dialog = $("dialog"),
@@ -31,7 +31,7 @@
   google.type = "button";
   google.className = "google-search";
   google.textContent = "Search Google in chat";
-  google.title = "Use Google-grounded AI to answer here, with sources (requires configured Google API key).";
+  google.title = "Search with Google grounding inside this chat; citations are shown when provided.";
   $("footer").insertBefore(google, $(".clear"));
   google.addEventListener("click", searchGoogle);
 
@@ -95,21 +95,23 @@
     lastQuestion = question;
     input.value = "";
     try {
-      const response = await window.HostedAI.transport(config.endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "google_search", question: question.slice(0, 700) }),
-        signal: AbortSignal.any([controller.signal, AbortSignal.timeout(40000)])
-      });
-      const data = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(
-        (data && data.error) || ("Google grounding returned HTTP " + response.status)
+      let streamingMessage=null;
+      const data = await window.HostedAI.request(
+        {action:"google_search",question:question.slice(0,700)},
+        AbortSignal.any([controller.signal,AbortSignal.timeout(65000)]),
+        (partial)=>{
+          if(id!==sequence || !partial)return;
+          if(!streamingMessage)streamingMessage=bubble("","assistant");
+          streamingMessage.querySelector("p").textContent=partial;
+          $(".conversation").scrollTop=$(".conversation").scrollHeight;
+        }
       );
       if (!data || typeof data.answer !== "string" || !data.answer.trim())
-        throw new Error("Google grounding returned no answer.");
+        throw new Error("Google Search returned no answer.");
       if (id !== sequence) return;
       const answer = data.answer.slice(0, 8000);
-      const message = bubble(answer, "assistant");
+      const message = streamingMessage || bubble(answer, "assistant");
+      message.querySelector("p").textContent=answer;
       renderSearchSources(message, data);
       history.push({ role: "user", content: question },
                    { role: "assistant", content: answer });
@@ -150,18 +152,8 @@
     if (!dialog.open) dialog.showModal();
     if (question) input.value = question;
     input.focus();
-    // Explain the one-time setup visibly instead of pretending search is ready.
-    window.HostedAI.transport(config.endpoint.replace(/\/$/, "") + "/health", {
-      signal: AbortSignal.timeout(7000)
-    }).then((res) => res.json()).then((health) => {
-      if (health.configured === true) {
-        google.textContent = "Search Google in chat";
-        google.title = "Ask Google-grounded AI here, with citations.";
-      } else if (health.configured === false) {
-        google.textContent = "Google Search · setup required";
-        google.title = "The hosted AI service is not configured yet.";
-      }
-    }).catch(() => { /* keep search button; actual call reports any issue */ });
+    // Backend is already configured for Gemini; do not test obsolete Worker secrets.
+    google.textContent = "Search Google in chat";
   }
   function cancel() {
     sequence++;
@@ -217,51 +209,33 @@
     controller = new AbortController();
     $(".send").disabled = true;
     $(".send").textContent = "…";
-    status.textContent = "Thinking…";
+    status.textContent = "Gemini is preparing your answer…";
     $(".welcome").hidden = true;
     if (question !== lastQuestion) bubble(question, "user");
     lastQuestion = question;
     input.value = "";
     try {
-      const response = await window.HostedAI.transport(config.endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "assistant",
-          app: config.app,
-          question,
-          context,
-          history: history
-            .slice(-6)
-            .map((message) => ({
-              role: message.role,
-              content: message.content.slice(0, 1200),
-            })),
-        }),
-        signal: AbortSignal.any([
-          controller.signal,
-          AbortSignal.timeout(30000),
-        ]),
+      let streamingMessage=null;
+      const data = await window.HostedAI.request({
+        action: "assistant",
+        app: config.app,
+        question,
+        context,
+        history: history.slice(-6).map((m)=>({
+          role:m.role,content:m.content.slice(0,1200)
+        }))
+      },AbortSignal.any([controller.signal,AbortSignal.timeout(65000)]),(partial)=>{
+        if(id!==sequence || !partial)return;
+        if(!streamingMessage)streamingMessage=bubble("","assistant");
+        streamingMessage.querySelector("p").textContent=partial;
+        $(".conversation").scrollTop=$(".conversation").scrollHeight;
       });
-      let data;
-      try {
-        data = await response.json();
-      } catch {
-        throw new Error(
-          "The AI service could not be reached. Please try again.",
-        );
-      }
-      if (!response.ok)
-        throw new Error(
-          response.status === 429
-            ? "Please wait a minute before asking again."
-            : "The assistant is temporarily unavailable. You can continue using the site.",
-        );
-      if (typeof data.answer !== "string" || !data.answer.trim())
-        throw new Error("No answer came back. Please try again.");
+      if (!data || typeof data.answer !== "string" || !data.answer.trim())
+        throw new Error("Gemini did not return an answer. Please retry.");
       if (id !== sequence) return;
       const answer = data.answer.slice(0, 8000);
-      bubble(answer, "assistant");
+      const message = streamingMessage || bubble(answer, "assistant");
+      message.querySelector("p").textContent=answer;
       history.push(
         { role: "user", content: question },
         { role: "assistant", content: answer },
@@ -272,7 +246,7 @@
     } catch (error) {
       if (id !== sequence) return;
       status.textContent =
-        error.name === "TimeoutError"
+        error.name === "TimeoutError" || error.name === "AbortError"
           ? "The answer took too long. Please try again."
           : error.message || "AI is unavailable. Try again.";
       input.value = question;
