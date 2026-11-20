@@ -372,3 +372,8 @@ p { margin: 0; }
 @media (prefers-reduced-motion: reduce){
   .ai-generator *{animation:none!important;transition:none!important}
 }
+
+/* Secondary generator action shares the dark form palette. */
+.ai-gen-diagnostic{appearance:none;display:inline-flex;align-items:center;min-height:44px;margin:14px 0 0;padding:10px 16px;max-width:100%;border:1px solid #465783;border-radius:12px;background:#182440;color:#c9d6ff;font:600 .84rem/1.5 var(--font);cursor:pointer;text-align:left;transition:background .18s,border-color .18s}
+.ai-gen-diagnostic:hover{background:#26375c;border-color:#7b94d9}.ai-gen-diagnostic:disabled{opacity:.6;cursor:wait}.ai-gen-diagnostic:focus-visible{outline:3px solid #a5b4fc;outline-offset:3px}
+@media(max-width:600px){.topbar{flex-wrap:wrap}.top-links{margin-left:auto;flex-wrap:wrap}.ai-gen-diagnostic{width:100%;justify-content:center}}

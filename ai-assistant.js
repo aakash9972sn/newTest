@@ -25,7 +25,7 @@
     controller,
     sequence = 0,
     lastQuestion = "";
-  // Search uses Gemini's Google Search grounding via the same Cloudflare Worker.
+  // Search uses Gemini's Google Search grounding via the hosted Google Gemini backend.
   // Results and cited source links render INSIDE the existing chat dialog.
   const google = document.createElement("button");
   google.type = "button";

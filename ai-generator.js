@@ -1,4 +1,4 @@
-/* AI Test Generator — uses the existing secure Workers AI endpoint.
+/* AI Test Generator — uses the hosted Google Gemini API.
    Generated MCQ sets are stored locally on this device, separate from built-in tests. */
 (function () {
   'use strict';
@@ -132,7 +132,7 @@
     if (!host || host.dataset.ready) return;
     host.dataset.ready = '1';
     host.innerHTML =
-      '<div class="ai-gen-intro"><span class="ai-gen-kicker">✨ NEW · AI PRACTICE</span>' +
+      '<div class="ai-gen-intro"><span class="ai-gen-kicker">✦ GOOGLE GEMINI · AI PRACTICE</span>' +
       '<h2>Generate fresh tests with AI</h2>' +
       '<p>Choose an exam, subject and chapter. Every new set is saved on this device. ' +
       'AI-generated answers can be wrong—verify important solutions.</p></div>' +
@@ -147,7 +147,7 @@
       '<option value="2">2 different tests</option><option value="3">3 different tests</option></select></label>' +
       '<button type="submit" class="btn btn-primary" id="ai-gen-submit">Generate AI tests</button>' +
       '</form>' +
-      '<button type="button" class="ai-gen-diagnostic" id="ai-gen-diagnostic">Test AI connection (2 questions)</button>' +
+      '<button type="button" class="ai-gen-diagnostic" id="ai-gen-diagnostic">Check Gemini connection (2 questions)</button>' +
       '<div class="ai-gen-job" id="ai-gen-job" hidden>' +
       '<div class="ai-gen-job-line"><span id="ai-gen-progress-label">Preparing…</span>' +
       '<button type="button" class="ai-gen-cancel" id="ai-gen-cancel">Cancel</button></div>' +
