@@ -310,8 +310,10 @@
         ? schema.bookmark(user, data, () => fs.serverTimestamp())
         : schema.order(user, data, () => fs.serverTimestamp());
     const ref = fs.doc(db, 'users', user.uid, collection, id);
-    const prior = await fs.getDoc(ref);
-    if (prior.exists()) return true; // Never update an immutable record.
+    // These collections allow LIST + CREATE, but no UPDATE. A collection list
+    // avoids relying on separate per-document GET permissions in strict rules.
+    const listed = await fs.getDocs(fs.collection(db,'users',user.uid,collection));
+    if (listed.docs.some(doc => doc.id === id)) return true;
     await fs.setDoc(ref, payload);  // CREATE only; no merge or extra fields.
     return true;
   }
@@ -352,9 +354,10 @@
       try {
         const user = await readyUser();
         const ref = fs.doc(db,'users',user.uid,'orders',String(id));
-        const snapshot = await fs.getDoc(ref);
-        if (!snapshot.exists()) throw new Error('Order not found.');
-        if (snapshot.data().status === 'cancelled') return true;
+        const listed = await fs.getDocs(fs.collection(db,'users',user.uid,'orders'));
+        const orderDoc = listed.docs.find(doc => doc.id === String(id));
+        if (!orderDoc) throw new Error('Order not found.');
+        if (orderDoc.data().status === 'cancelled') return true;
         await fs.updateDoc(ref,{status:'cancelled'}); // EXACT only allowed update.
         message('Order status updated to cancelled.');
         return true;
