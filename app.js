@@ -685,6 +685,21 @@
     window.addEventListener('beforeunload', () => { if (run) saveProgress(); });
   }
 
+  /* Expose ONLY the current question for an explicit Google bookmark action.
+     No exam answer or private attempt is uploaded unless the user requests it. */
+  window.AakashTestCentre = Object.freeze({
+    getCurrentBookmark() {
+      if (!run || !run.questions[run.current]) return null;
+      const q = run.questions[run.current];
+      return {
+        exam: run.entry.exam.id === 'neet' ? 'NEET UG' : 'GATE ECE',
+        subject: run.entry.subject.name,
+        topic: q.t, question: q.q, options: q.o.slice(),
+        answerIndex: q.a, explanation: q.e
+      };
+    }
+  });
+
   /* ------------------------------------------------------------------- boot */
   wire();
   route();
