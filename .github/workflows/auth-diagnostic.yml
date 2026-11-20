@@ -1,0 +1,29 @@
+name: Diagnose live Firebase sign-in and chatbot
+on:
+  pull_request:
+    paths: ['scripts/browser-auth-diagnostic.mjs', '.github/workflows/auth-diagnostic.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  auth-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Setup browser
+        run: |
+          npm install --no-save --no-package-lock playwright
+          npx playwright install chromium --with-deps
+      - name: Inspect deployed login and Google popup availability
+        run: node scripts/browser-auth-diagnostic.mjs
+      - name: Save screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: login-diagnostic
+          path: auth-diagnostic.png
+          retention-days: 1
