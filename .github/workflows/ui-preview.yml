@@ -1,0 +1,41 @@
+name: Preview Gemini Chat and Account UI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "ai-assistant.js"
+      - "ai-assistant.css"
+      - "firebase-account.js"
+      - "firebase-account.css"
+      - "ai-config.js"
+      - "index.html"
+      - "scripts/browser-ui-preview.mjs"
+      - ".github/workflows/ui-preview.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ui-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install browser
+        run: |
+          npm install --no-save --no-package-lock playwright
+          npx playwright install chromium --with-deps
+      - name: Verify new Gemini and account UI in Chromium (AI mocked)
+        run: node scripts/browser-ui-preview.mjs
+      - name: Save screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gemini-preview
+          path: gemini-ui-preview.png
+          retention-days: 1
