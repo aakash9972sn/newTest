@@ -3,23 +3,23 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Test Centre — Practice tests for NEET &amp; GATE | AAKASH</title>
-  <meta name="description" content="A free practice-test centre: subject-wise tests for NEET and GATE with timers, a question palette, marking scheme, saved progress and full solutions.">
+  <title>Test Centre — Practice tests for NEET, GATE &amp; CUET | AAKASH</title>
+  <meta name="description" content="A free practice-test centre: subject-wise tests and previous-year papers for NEET, GATE, CUET PG and CUCET with timers, a question palette, marking scheme, saved progress and answer review.">
   <meta name="theme-color" content="#0b1120">
-  <meta property="og:title" content="Test Centre — Practice tests for NEET &amp; GATE">
-  <meta property="og:description" content="Subject-wise practice tests with timers, a question palette, saved progress and full solutions.">
+  <meta property="og:title" content="Test Centre — Practice tests for NEET, GATE &amp; CUET">
+  <meta property="og:description" content="Subject-wise practice tests with timers, a question palette, saved progress and answer review.">
   <meta property="og:type" content="website">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20261120-gemini3">
+  <link rel="stylesheet" href="styles.css?v=20261120-pyp1">
 </head>
 <body>
 
   <header class="topbar wrap">
     <a class="brand" href="#/">
       <span class="brand-mark" aria-hidden="true">A</span>
-      <span>Test Centre<small>Practice · NEET &amp; GATE</small></span>
+      <span>Test Centre<small>Practice · NEET, GATE &amp; CUET</small></span>
     </a>
     <nav class="top-links" aria-label="Secondary">
       <a href="https://aakash9972sn.github.io/aakash-portfolio/">Portfolio</a>
@@ -32,16 +32,26 @@
     <section class="hero wrap">
       <span class="hero-eyebrow">Practice test centre</span>
       <h1>Train like it <em>counts.</em></h1>
-      <p class="hero-lede">Subject-wise practice tests with a live timer, a question palette, exam marking, saved progress and complete solutions. Pick an exam, choose a subject and begin — your attempt resumes right where you stopped.</p>
+      <p class="hero-lede">Subject-wise practice tests with a live timer, a question palette, exam marking, saved progress and answer review. Pick an exam, choose a subject and begin — your attempt resumes right where you stopped.</p>
       <div id="home-stats" aria-label="Site summary"></div>
     </section>
 
     <div class="wrap">
+      <section class="pyp-library" aria-labelledby="pyp-title">
+        <div class="pyp-heading"><div><span class="hero-eyebrow">Previous-year papers</span><h2 id="pyp-title">275 questions. Three complete papers.</h2></div><span class="pyp-count">2021 — 2025</span></div>
+        <p>Practise the supplied papers in their original question order. Each paper includes a timer, saved progress and answer-key review.</p>
+        <div class="pyp-links">
+          <a href="#/t/cuet-pg-life-sciences-2025"><span>CUET PG · 2025</span><b>Life Sciences</b><small>75 questions · 90 minutes</small><i aria-hidden="true">↗</i></a>
+          <a href="#/t/cuet-pg-zoology-2022"><span>CUET PG · 2022</span><b>Zoology</b><small>100 questions · 120 minutes</small><i aria-hidden="true">↗</i></a>
+          <a href="#/t/cucet-life-sciences-2021"><span>CUCET · 2021</span><b>Life Sciences</b><small>100 questions · 120 minutes</small><i aria-hidden="true">↗</i></a>
+        </div>
+        <details class="pyp-source"><summary>Source &amp; scoring notes</summary><p>Imported from your 275-question CSV. Three source-flagged questions (2025 Q38, 2022 Q78 and 2021 Q62) remain available for review but do not affect marks, accuracy or maximum score. Each paper uses +4 for correct answers and −1 for wrong answers. This is a practice score, not an official result. Detailed explanations and original question images were not included in the CSV; any supplied image descriptions are retained.</p><p>Exam references: <a href="https://exams.nta.ac.in/CUET-PG/images/ib-of-cuet-pg-2025.pdf" target="_blank" rel="noopener">CUET PG 2025 bulletin</a> · <a href="https://cuj.ac.in/file/admission/CUET-22/CUET%20PG%20Information%20Bulletin%202022.pdf" target="_blank" rel="noopener">CUET PG 2022 bulletin</a> · <a href="https://www.nta.ac.in/Download/Notice/Notice_20210816112158.pdf" target="_blank" rel="noopener">CUCET 2021 notice</a></p></details>
+      </section>
       <section id="ai-generator" class="ai-generator" aria-label="AI test generator"></section>
       <div id="resume-banner" hidden></div>
 
       <div class="filters">
-        <div id="exam-tabs" role="tablist" aria-label="Exams"></div>
+        <div id="exam-tabs" role="group" aria-label="Exams"></div>
         <div id="subject-chips" aria-label="Subjects"></div>
         <label class="search"><input id="search" type="search" placeholder="Search tests…" aria-label="Search tests"></label>
       </div>
@@ -72,11 +82,13 @@
         <span id="runner-progress-text">0 / 0 answered</span>
       </div>
 
+      <p class="runner-note" id="runner-note"></p>
       <div class="runner-body">
         <section class="q-pane">
           <div class="q-head"><span id="q-index"></span><span id="q-topic"></span></div>
+          <p class="question-source-note" id="q-source-note" hidden></p>
           <h3 id="q-text"></h3>
-          <div class="options" id="q-options" role="listbox" aria-label="Answer options"></div>
+          <div class="options" id="q-options" role="group" aria-label="Answer options"></div>
           <div class="explanation" id="q-explanation" hidden></div>
           <div class="q-actions">
             <button type="button" id="btn-clear">Clear response</button>
@@ -93,7 +105,7 @@
           <div class="palette-legend">
             <span><i class="lg-answered"></i> Answered (<b id="pal-answered">0</b>)</span>
             <span><i class="lg-marked"></i> Marked (<b id="pal-marked">0</b>)</span>
-            <span><i class="lg-unseen"></i> Unseen (<b id="pal-unseen">0</b>)</span>
+            <span><i class="lg-unseen"></i> Unanswered (<b id="pal-unseen">0</b>)</span>
           </div>
           <div class="palette-grid" id="palette-grid"></div>
           <div class="palette-footer">
@@ -119,12 +131,14 @@
   <div id="modal" hidden></div>
 
   <script src="data.js"></script>
+  <script src="pyp-data.js?v=20261120-pyp1"></script>
+  <script src="test-core.js?v=20261120-pyp1"></script>
   <script src="hosted-ai.js?v=20261120-gemini3"></script>
 <script src="firebase-account.js?v=20261120-auth4" defer></script>
 <script src="ai-config.js?v=20261120-gemini3"></script>
-  <script src="ai-coach.js?v=20261120-hosted1"></script>
-  <script src="ai-generator.js?v=20261120-ui2"></script>
-  <script src="app.js?v=20261120-hosted1"></script>
+  <script src="ai-coach.js?v=20261120-pyp1"></script>
+  <script src="ai-generator.js?v=20261120-pyp1"></script>
+  <script src="app.js?v=20261120-pyp1"></script>
 <script src="ai-assistant.js?v=20261120-gemini3" defer></script>
 </body>
 </html>

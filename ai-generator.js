@@ -128,6 +128,7 @@
   }
 
   function mount(exams, register, refresh) {
+    exams = exams.filter(exam => exam.aiSupported !== false);
     const host = document.querySelector('#ai-generator');
     if (!host || host.dataset.ready) return;
     host.dataset.ready = '1';

@@ -112,7 +112,7 @@
       button.addEventListener('click', async () => {
         button.disabled = true; status.hidden = false; status.textContent = 'Preparing explanation…';
         try {
-          const data = await window.HostedAI.request({action:'doubt',question:{exam:result.exam,subject:result.subject,question:q.q,options:q.o,correctIndex:q.a,selectedIndex:result.responses[i]??null,userDoubt:'Explain the solution step by step and check the supplied answer key.'}},AbortSignal.timeout(60000));
+          const data = await window.HostedAI.request({action:'doubt',question:{exam:result.exam,subject:result.subject,question:q.q,options:q.o,correctIndex:q.a,selectedIndex:result.responses[i]??null,userDoubt:q.unscored ? 'This question has a disputed source key and is excluded from scoring. Do not treat correctIndex as authoritative. Explain the ambiguity and assess each option. Source note: '+q.sourceAnswer : 'Explain the solution step by step and check the supplied answer key.'}},AbortSignal.timeout(60000));
           if(typeof data.answer!=='string'||!data.answer.trim())throw new Error('No explanation returned.');
           status.textContent=data.answer;
         } catch(error){status.textContent=error.message||'Explanation unavailable. Please retry.';}

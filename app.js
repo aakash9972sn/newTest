@@ -26,6 +26,7 @@
   const RKEY = (id) => 'tclab.result.' + id;
 
   /* ------------------------------------------------------------------ index */
+  const Core = window.TestCentreCore;
   const EXAMS = window.EXAM_DATA || [];
   const BANKS = window.QUESTION_BANKS || {};
   const TESTS = [];
@@ -70,6 +71,8 @@
   }
 
   function route() {
+    closeModal(false);
+    if (run) { saveProgress(true); run = null; stopTimer(); }
     const hash = location.hash || '#/';
     const tMatch = hash.match(/^#\/t\/(.+)$/);
     const rMatch = hash.match(/^#\/r\/(.+)$/);
@@ -93,7 +96,10 @@
   let filterSubject = 'all';
   let searchTerm = '';
 
-  function progressOf(id) { return store.get(PKEY(id), null); }
+  function progressOf(id) {
+    const entry = findEntry(id);
+    return entry ? Core.progress(store.get(PKEY(id), null), questionsOf(entry.test), entry.test.duration * 60) : null;
+  }
 
   function showHome() {
     stopTimer();
@@ -115,7 +121,7 @@
     const inProgress = TESTS.filter((x) => progressOf(x.test.id)).length;
     const attempted = TESTS.filter((x) => store.get(BKEY(x.test.id), null)).length;
     const subjectCount = EXAMS.reduce((n, e) => n + e.subjects.length, 0);
-    const questions = TESTS.reduce((n, x) => n + questionsOf(x.test).length, 0);
+    const questions = new Set(TESTS.flatMap(x => questionsOf(x.test).map(q => JSON.stringify([q.q, q.o])))).size;
     const stats = [
       { v: TESTS.length, l: 'Tests' },
       { v: subjectCount, l: 'Subjects' },
@@ -310,14 +316,22 @@
 
   function startTimer() {
     stopTimer();
-    updateTimerText();
-    timerId = setInterval(() => {
+    run.deadline = Date.now() + run.timeLeft * 1000;
+    saveProgress();
+    const tick = () => {
       if (!run) return;
-      run.timeLeft--;
+      run.timeLeft = Core.remaining(run.deadline);
       updateTimerText();
-      if (run.timeLeft % 5 === 0) saveProgress();
-      if (run.timeLeft <= 0) { stopTimer(); submit(true); }
-    }, 1000);
+      if (run.timeLeft <= 0) { submit(true); return; }
+      saveProgress();
+    };
+    tick();
+    if (run) timerId = setInterval(tick, 1000);
+  }
+  function expired() {
+    if (!run) return true;
+    if (Number.isFinite(run.deadline) && Core.remaining(run.deadline) <= 0) { submit(true); return true; }
+    return false;
   }
   function stopTimer() { if (timerId) { clearInterval(timerId); timerId = null; } }
 
@@ -473,23 +487,14 @@
   }
 
   function submit(auto) {
+    if (!run) return;
+    closeModal(false);
     stopTimer();
-    const m = markingOf(run.test);
-    let correct = 0, wrong = 0, unattempted = 0;
-    const topicStats = {};
-    run.questions.forEach((q, i) => {
-      const r = run.responses[i];
-      const topic = q.t || 'General';
-      if (!topicStats[topic]) topicStats[topic] = { correct: 0, wrong: 0, unattempted: 0, total: 0 };
-      topicStats[topic].total++;
-      if (r === null || r === undefined) { unattempted++; topicStats[topic].unattempted++; }
-      else if (r === q.a) { correct++; topicStats[topic].correct++; }
-      else { wrong++; topicStats[topic].wrong++; }
-    });
-    const score = Math.round((correct * m.correct - wrong * m.wrong) * 100) / 100;
-    const totalMarks = run.questions.length * m.correct;
-    const attempted = correct + wrong;
-    const accuracy = attempted ? Math.round((correct / attempted) * 100) : 0;
+    if (Number.isFinite(run.deadline)) run.timeLeft = Core.remaining(run.deadline);
+    const scored = Core.score(run.questions, run.responses, markingOf(run.test));
+    const { correct, wrong, unattempted, accuracy, score, excluded } = scored;
+    const topicStats = scored.topics;
+    const totalMarks = scored.total;
     const timeUsed = run.total - Math.max(0, run.timeLeft);
     const result = {
       testId: run.test.id,
@@ -628,21 +633,40 @@
   }
 
   /* ----------------------------------------------------------------- modal */
+  let modalFocus = null;
+  function closeModal(restoreFocus = true) {
+    const m = $('#modal');
+    m.hidden = true;
+    m.innerHTML = '';
+    m.onclick = null;
+    m.onkeydown = null;
+    if (restoreFocus && modalFocus && modalFocus.isConnected) modalFocus.focus({ preventScroll: true });
+    modalFocus = null;
+  }
   function modal(opts) {
+    closeModal(false);
+    modalFocus = document.activeElement;
     const m = $('#modal');
     m.hidden = false;
     m.innerHTML =
-      '<div class="modal-card" role="dialog" aria-modal="true">' +
-      '<h3>' + esc(opts.title) + '</h3><div class="modal-body">' + opts.body + '</div>' +
+      '<div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">' +
+      '<h3 id="modal-title">' + esc(opts.title) + '</h3><div class="modal-body">' + opts.body + '</div>' +
       '<div class="modal-actions">' +
       '<button type="button" class="btn btn-ghost" id="modal-cancel">' + esc(opts.cancel || 'Cancel') + '</button>' +
       '<button type="button" class="btn btn-primary" id="modal-confirm">' + esc(opts.confirm || 'Confirm') + '</button>' +
       '</div></div>';
-    const close = () => { m.hidden = true; m.innerHTML = ''; };
-    $('#modal-cancel').addEventListener('click', close);
-    $('#modal-confirm').addEventListener('click', () => { close(); if (opts.onConfirm) opts.onConfirm(); });
-    m.addEventListener('click', (e) => { if (e.target === m) close(); }, { once: true });
-    $('#modal-confirm').focus();
+    $('#modal-cancel').addEventListener('click', () => closeModal());
+    $('#modal-confirm').addEventListener('click', () => { closeModal(); if (opts.onConfirm) opts.onConfirm(); });
+    m.onclick = (e) => { if (e.target === m) closeModal(); };
+    m.onkeydown = (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); closeModal(); }
+      if (e.key === 'Tab') {
+        const first = $('#modal-cancel'), last = $('#modal-confirm');
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    };
+    $('#modal-cancel').focus();
   }
 
   /* ------------------------------------------------------------------- wire */
