@@ -8,3 +8,9 @@
 .account-panel .account-close{position:absolute;right:16px;top:10px;width:36px;min-height:36px;padding:0;background:transparent;border-color:transparent;font-size:24px}
 .account-panel [role=status]{display:block;color:#b4c4ea;font-size:13px;overflow-wrap:anywhere;margin-top:16px}.account-panel [hidden]{display:none!important}.account-records h3{margin:22px 0 10px;font:600 17px system-ui}.account-records p{padding:10px 0;border-bottom:1px solid #35415d;overflow-wrap:anywhere}.account-records a{color:#b9c5ff;text-decoration:underline}.account-fallback{display:flex;justify-content:flex-end;max-width:1180px;margin:12px auto;padding:0 20px}
 @media(prefers-reduced-motion:reduce){.account-launcher,.account-panel button{transition:none}}
+
+.account-diagnostics{padding:12px 14px;border:1px solid #ab7b5b;border-radius:12px;
+  margin:12px 0;background:#3d2d2b;color:#ffe6d3;line-height:1.55;font-size:13px}
+.account-diagnostics[hidden]{display:none!important}
+.account-diagnostics p{margin:0 0 10px}
+.account-diagnostics a{color:#bfc7ff;text-decoration:underline;font-weight:650}

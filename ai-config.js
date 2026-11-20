@@ -5,12 +5,12 @@ window.TEST_CENTRE_AI_ENDPOINT =
 window.AAKASH_AI = {
   endpoint: window.TEST_CENTRE_AI_ENDPOINT,
   app: "study",
-  title: "Your AI study partner",
+  title: "Aakash Gemini",
   intro:
-    "Plan your revision, choose a practice test or work through a difficult concept.",
+    "Your Gemini-powered study companion. Ask concepts, plan revision or search Google with sources, right here.",
   suggestions: [
-    "Make a 7-day NEET revision plan",
-    "How should I review a mock test?",
+    "Explain a difficult NEET concept",
+    "Find recent GATE ECE exam updates",
     "Help me choose a GATE practice test",
   ],
   privacy:

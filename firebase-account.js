@@ -12,31 +12,64 @@
  const target=document.querySelector('.top-links, .header-actions, #main-navigation');if(target)target.append(launch);else{const row=document.createElement('div');row.className='account-fallback';row.append(launch);document.body.prepend(row);}
  const login=document.createElement('button'),bookmark=document.createElement('button'),status=document.createElement('span');login.className='account-login';login.textContent='Continue with Google';bookmark.textContent='Bookmark this page';bookmark.hidden=true;status.setAttribute('role','status');bar.append(close,heading,intro,login,bookmark,status);document.body.append(bar);
  const message=s=>status.textContent=s;
- async function init(){if(loading)return loading;loading=(async()=>{const prefix='https://www.gstatic.com/firebasejs/11.10.0/';const [app,a,f]=await Promise.all([import(prefix+'firebase-app.js'),import(prefix+'firebase-auth.js'),import(prefix+'firebase-firestore.js')]);au=a;fs=f;const instance=app.getApps().length?app.getApp():app.initializeApp(config);auth=a.getAuth(instance);db=f.getFirestore(instance,config.firestoreDatabaseId);await new Promise(resolve=>a.onAuthStateChanged(auth,user=>{login.textContent=user?'Sign out':'Continue with Google';bookmark.hidden=!user;message(user?'Signed in as '+(user.displayName||'your account'):'Progress stays on this device until you sign in.');resolve();}));})().catch(e=>{loading=null;throw e;});return loading;}
+ const diagnostics=document.createElement('div');
+ diagnostics.className='account-diagnostics';
+ diagnostics.hidden=true;
+ const info=document.createElement('p');
+ const official=document.createElement('a');
+ official.href='https://console.firebase.google.com/';
+ official.target='_blank'; official.rel='noopener noreferrer';
+ official.textContent='Open Firebase Console';
+ diagnostics.append(info,official);
+ bar.appendChild(diagnostics);
+ function clearDiagnostic(){diagnostics.hidden=true;info.textContent='';}
+
+ async function init(){if(loading)return loading;loading=(async()=>{const prefix='https://www.gstatic.com/firebasejs/11.10.0/';const [app,a,f]=await Promise.all([import(prefix+'firebase-app.js'),import(prefix+'firebase-auth.js'),import(prefix+'firebase-firestore.js')]);au=a;fs=f;const instance=app.getApps().length?app.getApp():app.initializeApp(config);auth=a.getAuth(instance);db=f.getFirestore(instance,config.firestoreDatabaseId);await new Promise((resolve,reject)=>{
+    let unsubscribe=()=>{};
+    const timeout=setTimeout(()=>{unsubscribe();reject(new Error('auth/initialization-timeout'));},15000);
+    const onReady=(user)=>{
+      clearTimeout(timeout);
+      login.textContent=user?'Sign out':'Continue with Google';
+      bookmark.hidden=!user;
+      message(user?'Signed in as '+(user.displayName||'your account'):'Progress stays on this device until you sign in.');
+      resolve();
+    };
+    try{unsubscribe=a.onAuthStateChanged(auth,onReady,(error)=>{clearTimeout(timeout);reject(error);});}
+    catch(error){clearTimeout(timeout);reject(error);}
+  });})().catch(e=>{loading=null;throw e;});return loading;}
  async function save(collection,id,data){if(!auth?.currentUser||!['testAttempts','bookmarks','orders'].includes(collection))return false;try{const uid=auth.currentUser.uid;await fs.setDoc(fs.doc(db,'users',uid,collection,String(id).replace(/\//g,'_')),{...JSON.parse(JSON.stringify(data)),updatedAt:fs.serverTimestamp()},{merge:true});message('Saved to your account.');return true;}catch{message('Cloud save unavailable. Your local progress is unchanged.');return false;}}
  function signInError(error){
-  const code=error?.code||'auth/sdk-unavailable';
+  const rawCode=error?.code||error?.message||'auth/sdk-unavailable';
+  const code=/^auth\/[a-z0-9.-]+$/.test(rawCode)?rawCode:'auth/sdk-unavailable';
   const messages={
    'auth/popup-blocked':'Your browser blocked the sign-in window. Allow popups for this site, then try again.',
    'auth/popup-closed-by-user':'Sign-in was cancelled. You can continue without an account.',
    'auth/cancelled-popup-request':'Another sign-in window is already open.',
-   'auth/unauthorized-domain':'Google sign-in is not enabled for this website domain.',
+   'auth/unauthorized-domain':'Firebase is blocking Google sign-in because aakash9972sn.github.io is not authorized. The project owner must add this exact hostname in Firebase Console → Authentication → Settings → Authorized domains.',
    'auth/operation-not-allowed':'Google sign-in has not been enabled for this Firebase project.',
    'auth/invalid-api-key':'The Firebase sign-in configuration needs to be corrected.',
    'auth/api-key-not-valid.-please-pass-a-valid-api-key.':'The Firebase sign-in configuration needs to be corrected.',
-   'auth/network-request-failed':'Could not connect to Google sign-in. Check your connection and retry.',
+   'auth/network-request-failed':'Could not connect to Firebase Authentication. Check your connection or privacy extensions, then retry.',
+   'auth/initialization-timeout':'Firebase is taking too long to initialize. Reload and retry.',
    'auth/sdk-unavailable':'Sign-in could not load. Check your connection or content blocker, then reopen Account.'
   };
   message((messages[code]||'Sign-in could not finish. Please retry.')+' ('+code+')');
+  const needsOwner=['auth/unauthorized-domain','auth/operation-not-allowed','auth/invalid-api-key','auth/api-key-not-valid.-please-pass-a-valid-api-key.'].includes(code);
+  if(needsOwner){
+    diagnostics.hidden=false;
+    info.textContent=code==='auth/unauthorized-domain'?
+      'Required project setting: add aakash9972sn.github.io to Authorized domains (without https:// or /newTest/), then retry.' :
+      'The Firebase project owner must check Authentication → Sign-in method and project credentials. Changing website JavaScript will not resolve this server-side setting.';
+  } else clearDiagnostic();
  }
  async function prepareSignIn(){
-  login.disabled=true;login.textContent='Preparing secure sign-in…';
+  clearDiagnostic();login.disabled=true;login.textContent='Preparing secure sign-in…';
   try{await init();login.textContent=auth.currentUser?'Sign out':'Continue with Google';login.disabled=false;}
-  catch(error){login.textContent='Sign-in unavailable';signInError(error);}
+  catch(error){login.textContent='Retry Google sign-in setup';login.disabled=false;signInError(error);}
  }
  login.onclick=async()=>{
-  if(!auth||!au)return;
-  login.disabled=true;
+  if(!auth||!au){await prepareSignIn();return;}
+  clearDiagnostic();login.disabled=true;
   try{
    if(auth.currentUser){await au.signOut(auth);try{localStorage.removeItem('aakash.cloud.enabled');}catch{}return;}
    // Open directly within the user click, before any asynchronous work.
