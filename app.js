@@ -158,7 +158,7 @@
 
   function renderSubjectChips() {
     const subs = subjectsForFilter();
-    const chips = [{ id: 'all', name: 'All subjects' }].concat(subs);
+    const chips = [{ id: 'all', name: 'All subjects' }].concat(subs.map(s => ({ ...s, name: subs.filter(other => other.name === s.name).length > 1 ? s.name + ' · ' + s.exam.name : s.name })));
     $('#subject-chips').innerHTML = chips.map((s) => {
       const active = s.id === filterSubject ? ' is-active' : '';
       return '<button type="button" class="chip' + active + '" data-subject="' + esc(s.id) + '">' + esc(s.name) + '</button>';
